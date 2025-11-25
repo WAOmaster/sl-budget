@@ -1,0 +1,124 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  image         String?
+  language      String         @default("en") // en, si, ta
+  currency      String         @default("LKR")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  
+  categories    Category[]
+  transactions  Transaction[]
+  bills         Bill[]
+  budgets       Budget[]
+  savings       SavingsGoal[]
+  
+  @@map("users")
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  userId       String
+  name         String
+  icon         String?
+  color        String?
+  type         String        // income, expense
+  createdAt    DateTime      @default(now())
+  
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  bills        Bill[]
+  budgets      Budget[]
+  
+  @@map("categories")
+}
+
+model Transaction {
+  id                  String    @id @default(cuid())
+  userId              String
+  categoryId          String?
+  amount              Float
+  type                String    // income, expense
+  description         String?
+  date                DateTime  @default(now())
+  paymentMethod       String?
+  bank                String?
+  notes               String?
+  isRecurring         Boolean   @default(false)
+  recurringFrequency  String?   // daily, weekly, monthly, yearly
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category            Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  @@map("transactions")
+}
+
+model Bill {
+  id                 String    @id @default(cuid())
+  userId             String
+  name               String
+  amount             Float
+  dueDate            DateTime
+  frequency          String    // one_time, monthly, quarterly, yearly
+  categoryId         String?
+  isPaid             Boolean   @default(false)
+  reminderEnabled    Boolean   @default(true)
+  reminderDaysBefore Int       @default(3)
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category           Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  @@map("bills")
+}
+
+model Budget {
+  id          String    @id @default(cuid())
+  userId      String
+  categoryId  String?
+  amount      Float
+  period      String    // monthly, yearly
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  targetAmount Float
+  currentAmount Float   @default(0)
+  deadline    DateTime?
+  icon        String?
+  color       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("savings_goals")
+}
