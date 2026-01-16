@@ -1,25 +1,46 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
-  title: 'SL Budget - AI-Powered Finance Manager',
-  description: 'Personal finance management app for Sri Lanka with AI integration',
+  title: 'SL Budget - Personal Finance Manager for Sri Lanka',
+  description: 'Smart budgeting app designed for Sri Lankan life. Track expenses, manage budgets, import bank statements, and reach your savings goals.',
+  keywords: ['budget', 'finance', 'sri lanka', 'expense tracker', 'money management', 'LKR'],
+  authors: [{ name: 'Sashi Perera' }],
   manifest: '/manifest.json',
-  themeColor: '#0ea5e9',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
-}
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SL Budget',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#e87a1b',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
+    <html lang="en" className={inter.variable}>
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
+      <body className="font-sans antialiased">{children}</body>
     </html>
-  )
+  );
 }

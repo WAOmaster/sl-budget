@@ -2,24 +2,605 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+/* ============================================
+   SL BUDGET - CEYLON DESIGN SYSTEM
+   A Sri Lankan-inspired, user-centric UI
+   ============================================ */
+
+@layer base {
+  :root {
+    /* Background Colors */
+    --bg-primary: #fefdfb;
+    --bg-secondary: #fafaf9;
+    --bg-tertiary: #f5f5f4;
+    --bg-inverse: #1c1917;
+
+    /* Foreground Colors */
+    --fg-primary: #1c1917;
+    --fg-secondary: #57534e;
+    --fg-tertiary: #78716c;
+    --fg-muted: #a8a29e;
+    --fg-inverse: #fafaf9;
+
+    /* Brand Colors */
+    --brand-primary: #e87a1b;
+    --brand-primary-hover: #d45f11;
+    --brand-secondary: #22c55e;
+    --brand-accent: #3b82f6;
+    --brand-warning: #ed953c;
+    --brand-danger: #dc2626;
+
+    /* Border Colors */
+    --border-default: #e7e5e4;
+    --border-strong: #d6d3d1;
+    --border-focus: #e87a1b;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+    /* Radius */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.5rem;
+    --radius-full: 9999px;
+
+    /* Spacing */
+    --spacing-page: 1.5rem;
+    --spacing-card: 1.25rem;
+    --spacing-section: 2rem;
+  }
+
+  .dark {
+    --bg-primary: #1c1917;
+    --bg-secondary: #292524;
+    --bg-tertiary: #44403c;
+    --bg-inverse: #fafaf9;
+
+    --fg-primary: #fafaf9;
+    --fg-secondary: #d6d3d1;
+    --fg-tertiary: #a8a29e;
+    --fg-muted: #78716c;
+    --fg-inverse: #1c1917;
+
+    --border-default: #44403c;
+    --border-strong: #57534e;
+  }
+
+  /* Base Styles */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--fg-primary);
+    font-family: 'Inter', 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, sans-serif;
+  }
+
+  /* Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* Currency font */
+  .font-currency {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+
+  /* Selection */
+  ::selection {
+    background-color: #fcecd5;
+    color: #742f15;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+@layer components {
+  /* ============================================
+     BUTTON COMPONENTS
+     ============================================ */
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-medium transition-all duration-150;
+    @apply rounded-lg px-4 py-2.5 text-sm;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cinnamon-500 focus-visible:ring-offset-2;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-cinnamon-500 text-white shadow-button;
+    @apply hover:bg-cinnamon-600 active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply bg-stone-100 text-stone-700 border border-stone-200;
+    @apply hover:bg-stone-200 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply text-cinnamon-600 hover:bg-cinnamon-50;
+    @apply active:scale-[0.98];
+  }
+
+  .btn-danger {
+    @apply bg-red-500 text-white;
+    @apply hover:bg-red-600 active:scale-[0.98];
+  }
+
+  .btn-success {
+    @apply bg-tea-500 text-white;
+    @apply hover:bg-tea-600 active:scale-[0.98];
+  }
+
+  .btn-icon {
+    @apply p-2.5 rounded-lg;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-md;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base rounded-xl;
+  }
+
+  /* ============================================
+     CARD COMPONENTS
+     ============================================ */
+
+  .card {
+    @apply bg-white rounded-xl border border-stone-100 shadow-card;
+    @apply transition-shadow duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-card-hover hover:border-stone-200;
+  }
+
+  .card-interactive {
+    @apply cursor-pointer;
+    @apply hover:shadow-card-hover hover:border-stone-200;
+    @apply active:scale-[0.995];
+  }
+
+  .card-padding {
+    @apply p-5;
+  }
+
+  .card-header {
+    @apply px-5 py-4 border-b border-stone-100;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  .card-footer {
+    @apply px-5 py-4 border-t border-stone-100 bg-stone-50/50 rounded-b-xl;
+  }
+
+  /* Dark mode cards */
+  .dark .card {
+    @apply bg-stone-800 border-stone-700;
+  }
+
+  /* ============================================
+     INPUT COMPONENTS
+     ============================================ */
+
+  .input {
+    @apply w-full px-4 py-2.5 text-base rounded-lg;
+    @apply bg-white border border-stone-200;
+    @apply placeholder:text-stone-400;
+    @apply transition-colors duration-150;
+    @apply focus:outline-none focus:border-cinnamon-500 focus:ring-2 focus:ring-cinnamon-500/20;
+  }
+
+  .input-error {
+    @apply border-red-500 focus:border-red-500 focus:ring-red-500/20;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-stone-700 mb-1.5;
+  }
+
+  .input-hint {
+    @apply text-xs text-stone-500 mt-1;
+  }
+
+  .input-error-message {
+    @apply text-xs text-red-500 mt-1;
+  }
+
+  /* Amount input with currency prefix */
+  .input-amount-wrapper {
+    @apply relative;
+  }
+
+  .input-amount-prefix {
+    @apply absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-medium;
+  }
+
+  .input-amount {
+    @apply pl-14 font-mono text-lg font-semibold;
+  }
+
+  /* ============================================
+     SELECT COMPONENTS
+     ============================================ */
+
+  .select {
+    @apply w-full px-4 py-2.5 text-base rounded-lg appearance-none;
+    @apply bg-white border border-stone-200;
+    @apply bg-[url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")] bg-no-repeat bg-[right_1rem_center];
+    @apply transition-colors duration-150;
+    @apply focus:outline-none focus:border-cinnamon-500 focus:ring-2 focus:ring-cinnamon-500/20;
+  }
+
+  /* ============================================
+     BADGE COMPONENTS
+     ============================================ */
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-default {
+    @apply bg-stone-100 text-stone-700;
+  }
+
+  .badge-primary {
+    @apply bg-cinnamon-100 text-cinnamon-700;
+  }
+
+  .badge-success {
+    @apply bg-tea-100 text-tea-700;
+  }
+
+  .badge-warning {
+    @apply bg-amber-100 text-amber-700;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .badge-info {
+    @apply bg-ocean-100 text-ocean-700;
+  }
+
+  /* ============================================
+     PROGRESS BAR
+     ============================================ */
+
+  .progress-bar {
+    @apply h-2 w-full bg-stone-100 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+  }
+
+  .progress-fill-default {
+    @apply bg-cinnamon-500;
+  }
+
+  .progress-fill-success {
+    @apply bg-tea-500;
+  }
+
+  .progress-fill-warning {
+    @apply bg-amber-500;
+  }
+
+  .progress-fill-danger {
+    @apply bg-red-500;
+  }
+
+  /* ============================================
+     NAVIGATION COMPONENTS
+     ============================================ */
+
+  /* Desktop Sidebar */
+  .sidebar {
+    @apply fixed left-0 top-0 h-full w-64 bg-white border-r border-stone-100;
+    @apply flex flex-col;
+  }
+
+  .sidebar-logo {
+    @apply px-6 py-5 border-b border-stone-100;
+  }
+
+  .sidebar-nav {
+    @apply flex-1 px-3 py-4 space-y-1 overflow-y-auto;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium;
+    @apply text-stone-600 transition-colors duration-150;
+    @apply hover:bg-stone-50 hover:text-stone-900;
+  }
+
+  .sidebar-link-active {
+    @apply bg-cinnamon-50 text-cinnamon-700;
+    @apply hover:bg-cinnamon-100;
+  }
+
+  /* Mobile Bottom Navigation */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 bg-white border-t border-stone-100;
+    @apply flex items-center justify-around px-2 py-2;
+    @apply safe-area-pb;
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-1 px-3 py-2 rounded-lg;
+    @apply text-stone-500 transition-colors duration-150;
+  }
+
+  .bottom-nav-item-active {
+    @apply text-cinnamon-600;
+  }
+
+  .bottom-nav-label {
+    @apply text-[10px] font-medium;
+  }
+
+  /* Floating Action Button */
+  .fab {
+    @apply fixed bottom-24 right-5 z-50;
+    @apply w-14 h-14 rounded-full shadow-lg;
+    @apply bg-cinnamon-500 text-white;
+    @apply flex items-center justify-center;
+    @apply hover:bg-cinnamon-600 active:scale-95;
+    @apply transition-all duration-150;
+  }
+
+  /* ============================================
+     TRANSACTION CARD
+     ============================================ */
+
+  .transaction-card {
+    @apply flex items-center gap-4 p-4 rounded-xl;
+    @apply bg-white border border-stone-100;
+    @apply transition-all duration-150;
+    @apply hover:bg-stone-50;
+  }
+
+  .transaction-icon {
+    @apply w-10 h-10 rounded-full flex items-center justify-center;
+    @apply bg-stone-100 text-stone-600;
+  }
+
+  .transaction-amount-income {
+    @apply font-mono font-semibold text-tea-600;
+  }
+
+  .transaction-amount-expense {
+    @apply font-mono font-semibold text-stone-900;
+  }
+
+  /* ============================================
+     MODAL / DIALOG
+     ============================================ */
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm;
+    @apply animate-fade-in;
+  }
+
+  .modal {
+    @apply fixed inset-x-4 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2;
+    @apply bg-white rounded-t-2xl md:rounded-2xl shadow-modal;
+    @apply w-full md:max-w-md;
+    @apply animate-slide-up md:animate-scale-in;
+  }
+
+  .modal-header {
+    @apply flex items-center justify-between px-5 py-4 border-b border-stone-100;
+  }
+
+  .modal-title {
+    @apply text-lg font-semibold text-stone-900;
+  }
+
+  .modal-body {
+    @apply p-5 max-h-[60vh] md:max-h-[70vh] overflow-y-auto;
+  }
+
+  .modal-footer {
+    @apply flex gap-3 px-5 py-4 border-t border-stone-100;
+  }
+
+  /* ============================================
+     SKELETON LOADING
+     ============================================ */
+
+  .skeleton {
+    @apply bg-stone-200 rounded animate-pulse;
+  }
+
+  .skeleton-shimmer {
+    @apply relative overflow-hidden;
+    @apply after:absolute after:inset-0;
+    @apply after:bg-shimmer after:bg-[length:200%_100%];
+    @apply after:animate-shimmer;
+  }
+
+  /* ============================================
+     SECTION HEADERS
+     ============================================ */
+
+  .section-header {
+    @apply flex items-center justify-between mb-4;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold text-stone-500 uppercase tracking-wider;
+  }
+
+  .section-action {
+    @apply text-sm font-medium text-cinnamon-600 hover:text-cinnamon-700;
+  }
+
+  /* ============================================
+     STATS CARDS
+     ============================================ */
+
+  .stat-card {
+    @apply p-4 rounded-xl bg-white border border-stone-100;
+  }
+
+  .stat-label {
+    @apply text-xs font-medium text-stone-500 uppercase tracking-wider mb-1;
+  }
+
+  .stat-value {
+    @apply font-mono text-2xl font-semibold text-stone-900;
+  }
+
+  .stat-change-positive {
+    @apply text-xs font-medium text-tea-600;
+  }
+
+  .stat-change-negative {
+    @apply text-xs font-medium text-red-600;
+  }
+
+  /* ============================================
+     EMPTY STATES
+     ============================================ */
+
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 px-6 text-center;
+  }
+
+  .empty-state-icon {
+    @apply w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4;
+    @apply text-stone-400;
+  }
+
+  .empty-state-title {
+    @apply text-lg font-semibold text-stone-900 mb-1;
+  }
+
+  .empty-state-description {
+    @apply text-sm text-stone-500 mb-4;
+  }
+
+  /* ============================================
+     UTILITY CLASSES
+     ============================================ */
+
+  /* Page container */
+  .page-container {
+    @apply min-h-screen bg-stone-50;
+  }
+
+  /* Main content area with sidebar offset */
+  .main-content {
+    @apply md:ml-64;
+  }
+
+  /* Mobile safe areas */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Currency display */
+  .currency-positive {
+    @apply font-mono font-semibold text-tea-600;
+  }
+
+  .currency-negative {
+    @apply font-mono font-semibold text-stone-900;
+  }
+
+  .currency-large {
+    @apply font-mono text-3xl font-bold tracking-tight;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-stone-100 my-4;
+  }
+
+  /* Quick amount buttons */
+  .quick-amount-btn {
+    @apply px-4 py-2 rounded-lg text-sm font-medium;
+    @apply bg-stone-100 text-stone-700;
+    @apply hover:bg-cinnamon-100 hover:text-cinnamon-700;
+    @apply transition-colors duration-150;
+  }
+
+  /* Category pill */
+  .category-pill {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm;
+    @apply bg-stone-100 text-stone-700;
+  }
 }
 
 @layer utilities {
+  /* Text balance for better typography */
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-cinnamon-600 to-cinnamon-500 bg-clip-text text-transparent;
+  }
+
+  /* Glass effect for overlays */
+  .glass {
+    @apply bg-white/80 backdrop-blur-lg;
+  }
+
+  /* Touch-friendly tap target */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 }
