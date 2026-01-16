@@ -1,108 +1,55 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { ChevronRight, TrendingUp, Wallet } from 'lucide-react';
 import { BalanceCard, StatsGrid } from '@/components/stats';
 import { TransactionList, Transaction } from '@/components/transactions';
 import { BudgetSummary, Budget } from '@/components/budgets';
-import { Bill } from '@/components/bills';
 import { formatCurrency } from '@/lib/utils';
+import { useAppStore } from '@/stores/app-store';
 import { differenceInDays } from 'date-fns';
 
-// Mock data - replace with real API calls
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    description: 'Keells Super',
-    amount: 3450,
-    type: 'expense',
-    category: { name: 'Groceries', icon: '🛒' },
-    date: new Date(),
-    bank: 'Commercial Bank',
-  },
-  {
-    id: '2',
-    description: 'Lanka IOC',
-    amount: 2100,
-    type: 'expense',
-    category: { name: 'Fuel', icon: '⛽' },
-    date: new Date(),
-    bank: 'Sampath Bank',
-  },
-  {
-    id: '3',
-    description: 'Salary - January',
-    amount: 85000,
-    type: 'income',
-    category: { name: 'Salary', icon: '💰' },
-    date: new Date(Date.now() - 86400000),
-  },
-  {
-    id: '4',
-    description: 'Dialog Bill',
-    amount: 2800,
-    type: 'expense',
-    category: { name: 'Bills', icon: '📱' },
-    date: new Date(Date.now() - 86400000 * 2),
-  },
-];
-
-const mockBudgets: Budget[] = [
-  {
-    id: '1',
-    name: 'Food & Dining',
-    spent: 12500,
-    limit: 20000,
-    category: { name: 'Food', icon: '🍔', color: '#f97316' },
-    period: 'monthly',
-    daysRemaining: 15,
-  },
-  {
-    id: '2',
-    name: 'Transport',
-    spent: 8000,
-    limit: 15000,
-    category: { name: 'Transport', icon: '🚌', color: '#3b82f6' },
-    period: 'monthly',
-    daysRemaining: 15,
-  },
-  {
-    id: '3',
-    name: 'Shopping',
-    spent: 9500,
-    limit: 10000,
-    category: { name: 'Shopping', icon: '🛍️', color: '#ec4899' },
-    period: 'monthly',
-    daysRemaining: 15,
-  },
-];
-
-const mockBills: Bill[] = [
-  {
-    id: '1',
-    name: 'Electricity - CEB',
-    amount: 4500,
-    dueDate: new Date(Date.now() + 86400000 * 3),
-    frequency: 'monthly',
-    isPaid: false,
-    category: { icon: '⚡' },
-  },
-  {
-    id: '2',
-    name: 'Internet - SLT Fiber',
-    amount: 2999,
-    dueDate: new Date(Date.now() + 86400000 * 6),
-    frequency: 'monthly',
-    isPaid: false,
-    category: { icon: '🌐' },
-  },
-];
-
 export default function DashboardPage() {
-  // Calculate mock stats
-  const balance = 125430;
-  const monthlyBudget = 75000;
-  const budgetUsed = 42300;
+  const { transactions, budgets, bills, user } = useAppStore();
+
+  // Transform store data to component format
+  const displayTransactions: Transaction[] = transactions.slice(0, 4).map((t) => ({
+    id: t.id,
+    description: t.description,
+    amount: t.amount,
+    type: t.type,
+    category: { name: t.category, icon: t.categoryIcon },
+    date: new Date(t.date),
+    bank: t.bank,
+  }));
+
+  const displayBudgets: Budget[] = budgets.slice(0, 3).map((b) => ({
+    id: b.id,
+    name: b.category,
+    spent: b.spent,
+    limit: b.limit,
+    category: { name: b.category, icon: b.categoryIcon, color: '#e87a1b' },
+    period: b.period,
+    daysRemaining: 15,
+  }));
+
+  const upcomingBills = bills
+    .filter((b) => !b.isPaid)
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 3);
+
+  // Calculate stats from store data
+  const income = transactions
+    .filter((t) => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const expenses = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const balance = income - expenses + 80000; // Base balance
+  const monthlyBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
+  const budgetUsed = budgets.reduce((sum, b) => sum + b.spent, 0);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -111,13 +58,14 @@ export default function DashboardPage() {
         balance={balance}
         budgetUsed={budgetUsed}
         budgetTotal={monthlyBudget}
+        userName={user?.name}
       />
 
       {/* Stats Grid */}
       <StatsGrid
-        income={85000}
-        expenses={42300}
-        savings={15000}
+        income={income}
+        expenses={expenses}
+        savings={income - expenses}
         incomeChange={12}
         expenseChange={-8}
         savingsChange={5}
@@ -132,10 +80,16 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="card">
-          <TransactionList
-            transactions={mockTransactions.slice(0, 4)}
-            onTransactionClick={(t) => console.log('Clicked:', t)}
-          />
+          {displayTransactions.length > 0 ? (
+            <TransactionList
+              transactions={displayTransactions}
+              onTransactionClick={(t) => console.log('Clicked:', t)}
+            />
+          ) : (
+            <div className="p-8 text-center text-stone-500">
+              No transactions yet. Add your first transaction!
+            </div>
+          )}
         </div>
       </section>
 
@@ -150,17 +104,24 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="card card-padding space-y-3">
-            {mockBills.map((bill) => {
-              const daysUntil = differenceInDays(bill.dueDate, new Date());
+            {upcomingBills.map((bill) => {
+              const daysUntil = differenceInDays(new Date(bill.dueDate), new Date());
+              const isOverdue = daysUntil < 0;
               return (
                 <div key={bill.id} className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <span>{bill.category?.icon}</span>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isOverdue ? 'bg-red-100' : 'bg-amber-100'
+                  }`}>
+                    <span>📄</span>
                   </div>
                   <div className="flex-1">
                     <p className="font-medium text-stone-900">{bill.name}</p>
-                    <p className="text-sm text-stone-500">
-                      {daysUntil === 0 ? 'Due today' : `${daysUntil} days`}
+                    <p className={`text-sm ${isOverdue ? 'text-red-500' : 'text-stone-500'}`}>
+                      {isOverdue
+                        ? `${Math.abs(daysUntil)} days overdue`
+                        : daysUntil === 0
+                        ? 'Due today'
+                        : `${daysUntil} days`}
                     </p>
                   </div>
                   <p className="font-mono font-medium text-stone-900">
@@ -169,7 +130,7 @@ export default function DashboardPage() {
                 </div>
               );
             })}
-            {mockBills.length === 0 && (
+            {upcomingBills.length === 0 && (
               <p className="text-center text-stone-500 py-4">No upcoming bills</p>
             )}
           </div>
@@ -184,7 +145,11 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="card card-padding">
-            <BudgetSummary budgets={mockBudgets} />
+            {displayBudgets.length > 0 ? (
+              <BudgetSummary budgets={displayBudgets} />
+            ) : (
+              <p className="text-center text-stone-500 py-4">No budgets set</p>
+            )}
           </div>
         </section>
       </div>
@@ -213,7 +178,7 @@ export default function DashboardPage() {
             <div>
               <h3 className="font-medium text-stone-900">Great job on utilities!</h3>
               <p className="text-sm text-stone-500 mt-1">
-                You're Rs. 800 under budget for electricity this month.
+                You&apos;re Rs. 800 under budget for electricity this month.
               </p>
             </div>
           </div>

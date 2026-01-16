@@ -67,14 +67,22 @@ interface BalanceCardProps {
   balance: number;
   budgetUsed: number;
   budgetTotal: number;
+  userName?: string;
 }
 
-export function BalanceCard({ balance, budgetUsed, budgetTotal }: BalanceCardProps) {
-  const percentage = Math.round((budgetUsed / budgetTotal) * 100);
+export function BalanceCard({ balance, budgetUsed, budgetTotal, userName }: BalanceCardProps) {
+  const percentage = budgetTotal > 0 ? Math.round((budgetUsed / budgetTotal) * 100) : 0;
   const remaining = 100 - percentage;
+
+  // Get time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
     <div className="card p-6 bg-gradient-to-br from-cinnamon-500 to-cinnamon-600 text-white">
+      {userName && (
+        <p className="text-cinnamon-100 text-sm mb-3">{greeting}, {userName}</p>
+      )}
       <p className="text-cinnamon-100 text-sm font-medium mb-1">Your Balance</p>
       <p className="font-mono text-3xl font-bold tracking-tight mb-4">
         {formatCurrency(balance)}
