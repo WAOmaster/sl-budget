@@ -16,14 +16,21 @@ interface ThemeProviderState {
   resolvedTheme: 'light' | 'dark';
 }
 
-const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined);
+// Default values for SSR/prerendering
+const defaultState: ThemeProviderState = {
+  theme: 'system',
+  setTheme: () => {},
+  resolvedTheme: 'light',
+};
+
+const ThemeProviderContext = createContext<ThemeProviderState>(defaultState);
 
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
   storageKey = 'sl-budget-theme',
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
 
@@ -31,7 +38,7 @@ export function ThemeProvider({
     setMounted(true);
     const stored = localStorage.getItem(storageKey) as Theme | null;
     if (stored) {
-      setTheme(stored);
+      setThemeState(stored);
     }
   }, [storageKey]);
 
@@ -55,19 +62,18 @@ export function ThemeProvider({
     setResolvedTheme(resolved);
   }, [theme, mounted]);
 
-  const value = {
-    theme,
-    setTheme: (newTheme: Theme) => {
+  const setTheme = (newTheme: Theme) => {
+    if (typeof window !== 'undefined') {
       localStorage.setItem(storageKey, newTheme);
-      setTheme(newTheme);
-    },
-    resolvedTheme,
+    }
+    setThemeState(newTheme);
   };
 
-  // Prevent flash of unstyled content
-  if (!mounted) {
-    return <>{children}</>;
-  }
+  const value: ThemeProviderState = {
+    theme,
+    setTheme,
+    resolvedTheme,
+  };
 
   return (
     <ThemeProviderContext.Provider value={value}>
@@ -77,9 +83,5 @@ export function ThemeProvider({
 }
 
 export const useTheme = () => {
-  const context = useContext(ThemeProviderContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
+  return useContext(ThemeProviderContext);
 };
