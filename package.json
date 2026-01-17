@@ -1,18 +1,15 @@
 {
   "name": "sl-budget",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "postinstall": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "firebase": "^11.2.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -23,7 +20,6 @@
     "papaparse": "^5.4.1",
     "lucide-react": "^0.356.0",
     "zod": "^3.22.0",
-    "pdf-parse": "^1.1.1",
     "clsx": "^2.1.0"
   },
   "devDependencies": {
@@ -34,7 +30,6 @@
     "typescript": "^5",
     "tailwindcss": "^3.4.0",
     "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0",
-    "prisma": "^5.22.0"
+    "postcss": "^8.4.0"
   }
 }
