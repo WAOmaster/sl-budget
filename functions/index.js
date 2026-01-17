@@ -5,59 +5,39 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 const db = admin.firestore();
 
-// Sri Lankan Bank SMS Patterns - Updated for real SMS formats
+// Sri Lankan Bank SMS Patterns
 const SMS_PATTERNS = {
-  // Commercial Bank
   COMBANK: {
     purchase: /Purchase at (.+?) for LKR ([\d,]+\.?\d*)/i,
-    creditCard: /Purchase at (.+?) for LKR ([\d,]+\.?\d*).*?credit card #(\d+).*?AVL BAL ([\d,]+\.?\d*)/i,
     atm: /ATM withdrawal.*?LKR ([\d,]+\.?\d*)/i,
     transfer: /Transfer of LKR ([\d,]+\.?\d*)/i,
   },
-  // Seylan Bank
   SEYLAN: {
     purchase: /spent LKR\s*([\d,]+\.?\d*)\s*at\s*(.+)/i,
     transfer: /transferred LKR\s*([\d,]+\.?\d*)/i,
   },
-  // HNB
   HNB: {
     purchase: /debited by LKR\s*([\d,]+\.?\d*)/i,
     credit: /credited.*?LKR\s*([\d,]+\.?\d*)/i,
   },
-  // Sampath Bank
   SAMPATH: {
     purchase: /Purchase.*?LKR\s*([\d,]+\.?\d*)/i,
-    debit: /debited.*?LKR\s*([\d,]+\.?\d*)/i,
   },
-  // FriMi / Nations Trust
   FRIMI: {
     purchase: /spent Rs\.?\s*([\d,]+\.?\d*)/i,
     transfer: /sent Rs\.?\s*([\d,]+\.?\d*)/i,
     received: /received Rs\.?\s*([\d,]+\.?\d*)/i,
   },
-  // Dialog / Mobitel
-  DIALOG: {
-    recharge: /recharged.*?Rs\.?\s*([\d,]+\.?\d*)/i,
-    payment: /payment.*?Rs\.?\s*([\d,]+\.?\d*)/i,
-  },
-  // Utility bills
-  LECO: { bill: /bill.*?Rs\.?\s*([\d,]+\.?\d*)/i },
-  CEB: { bill: /bill.*?Rs\.?\s*([\d,]+\.?\d*)/i },
-  NWSDB: { bill: /water.*?Rs\.?\s*([\d,]+\.?\d*)/i },
 };
 
 // Category mapping
 const CATEGORY_MAP = {
   purchase: "shopping",
-  creditCard: "shopping", 
   atm: "cash",
   transfer: "transfer",
   bill: "utilities",
-  recharge: "mobile",
-  payment: "bill_payment",
   received: "income",
   credit: "income",
-  debit: "expense",
 };
 
 // Parse SMS message
@@ -73,10 +53,8 @@ function parseSMS(message, sender) {
     parsed: false,
   };
 
-  // Normalize sender (remove numbers, get bank name)
-  const bankName = sender.replace(/[0-9\s\-]/g, "").toUpperCase();
-  
-  // Try specific bank patterns first
+  // Normalize sender
+  const bankName = (sender || "").replace(/[0-9\s\-]/g, "").toUpperCase();
   const patterns = SMS_PATTERNS[bankName] || {};
   
   for (const [txType, pattern] of Object.entries(patterns)) {
@@ -85,37 +63,24 @@ function parseSMS(message, sender) {
       result.parsed = true;
       result.category = CATEGORY_MAP[txType] || txType;
       
-      // Handle different pattern capture groups
-      if (txType === "creditCard") {
-        // Credit card purchase with balance
-        result.merchant = match[1]?.trim();
-        result.amount = parseFloat(match[2].replace(/,/g, ""));
-        result.cardLast4 = match[3];
-        result.balance = parseFloat(match[4].replace(/,/g, ""));
-      } else if (txType === "purchase" && match[2]) {
-        // Purchase with merchant first, amount second
+      if (txType === "purchase" && match[2]) {
         result.merchant = match[1]?.trim();
         result.amount = parseFloat(match[2].replace(/,/g, ""));
       } else if (match[1]) {
-        // Amount only patterns
         result.amount = parseFloat(match[1].replace(/,/g, ""));
         if (match[2]) result.merchant = match[2]?.trim();
       }
       
-      // Set type based on category
       if (["income", "received", "credit"].includes(result.category)) {
         result.type = "income";
       } else if (result.category === "transfer") {
         result.type = "transfer";
-      } else {
-        result.type = "expense";
       }
-      
       break;
     }
   }
 
-  // Fallback: extract any LKR/Rs amount if no pattern matched
+  // Fallback: extract any LKR/Rs amount
   if (!result.parsed || result.amount === 0) {
     const amountMatch = message.match(/(?:LKR|Rs\.?)\s*([\d,]+\.?\d*)/i);
     if (amountMatch) {
@@ -123,19 +88,19 @@ function parseSMS(message, sender) {
       result.parsed = true;
     }
     
-    // Try to extract merchant from "Purchase at X" or "at X"
-    const merchantMatch = message.match(/(?:Purchase at|at)\s+([A-Za-z0-9\s\(\)]+?)(?:\s+for|\s+LKR|\s+Rs)/i);
+    // Extract merchant from "Purchase at X"
+    const merchantMatch = message.match(/Purchase at\s+(.+?)\s+for/i);
     if (merchantMatch) {
       result.merchant = merchantMatch[1].trim();
       result.category = "shopping";
       result.type = "expense";
     }
     
-    // Extract card number if present
+    // Extract card number
     const cardMatch = message.match(/card\s*#?(\d{4})/i);
     if (cardMatch) result.cardLast4 = cardMatch[1];
     
-    // Extract balance if present
+    // Extract balance
     const balMatch = message.match(/(?:AVL\s*BAL|Balance)[:\s]*([\d,]+\.?\d*)/i);
     if (balMatch) result.balance = parseFloat(balMatch[1].replace(/,/g, ""));
   }
@@ -144,6 +109,7 @@ function parseSMS(message, sender) {
 }
 
 // SMS Webhook - receives from SMS Gateway app
+// SMS Gateway sends: { deviceId, event, id, payload: { message, phoneNumber, simNumber, receivedAt }, webhookId }
 exports.smsWebhook = functions.https.onRequest(async (req, res) => {
   // CORS
   res.set("Access-Control-Allow-Origin", "*");
@@ -158,13 +124,39 @@ exports.smsWebhook = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    const { message, phoneNumber, receivedAt } = req.body;
+    const body = req.body;
+    console.log("Received webhook:", JSON.stringify(body));
+    
+    // Handle SMS Gateway nested payload format
+    // SMS Gateway sends: { payload: { message, phoneNumber, ... } }
+    // Also support direct format for testing: { message, phoneNumber, ... }
+    let message, phoneNumber, receivedAt, simNumber;
+    
+    if (body.payload) {
+      // SMS Gateway format
+      message = body.payload.message;
+      phoneNumber = body.payload.phoneNumber;
+      receivedAt = body.payload.receivedAt;
+      simNumber = body.payload.simNumber;
+      console.log("SMS Gateway format detected");
+    } else {
+      // Direct format (for testing)
+      message = body.message;
+      phoneNumber = body.phoneNumber;
+      receivedAt = body.receivedAt;
+      simNumber = body.simNumber || 1;
+      console.log("Direct format detected");
+    }
     
     if (!message) {
-      return res.status(400).json({ error: "Missing message" });
+      console.log("No message found in body:", JSON.stringify(body));
+      return res.status(400).json({ error: "Missing message", receivedBody: body });
     }
 
+    console.log("Processing SMS from:", phoneNumber, "Message:", message.substring(0, 50));
+    
     const parsed = parseSMS(message, phoneNumber || "UNKNOWN");
+    console.log("Parsed result:", JSON.stringify(parsed));
     
     if (parsed.amount > 0) {
       const transaction = {
@@ -178,6 +170,7 @@ exports.smsWebhook = functions.https.onRequest(async (req, res) => {
         cardLast4: parsed.cardLast4,
         balance: parsed.balance,
         rawMessage: message,
+        simNumber: simNumber,
         timestamp: admin.firestore.Timestamp.fromDate(
           receivedAt ? new Date(receivedAt) : new Date()
         ),
@@ -185,10 +178,12 @@ exports.smsWebhook = functions.https.onRequest(async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      // Remove null values
+      // Remove null/undefined values
       Object.keys(transaction).forEach(k => transaction[k] == null && delete transaction[k]);
 
       const docRef = await db.collection("transactions").add(transaction);
+      console.log("Transaction saved:", docRef.id);
+      
       return res.json({ 
         status: "success", 
         transactionId: docRef.id, 
@@ -196,6 +191,7 @@ exports.smsWebhook = functions.https.onRequest(async (req, res) => {
       });
     }
 
+    console.log("No amount found, skipping");
     return res.json({ status: "skipped", message: "No amount found", parsed });
   } catch (error) {
     console.error("Webhook error:", error);
@@ -220,6 +216,7 @@ exports.getTransactions = functions.https.onRequest(async (req, res) => {
     
     return res.json({ success: true, count: transactions.length, transactions });
   } catch (error) {
+    console.error("getTransactions error:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -247,6 +244,7 @@ exports.getStats = functions.https.onRequest(async (req, res) => {
     stats.balance = stats.totalIncome - stats.totalExpense;
     return res.json({ success: true, stats });
   } catch (error) {
+    console.error("getStats error:", error);
     return res.status(500).json({ error: error.message });
   }
 });
