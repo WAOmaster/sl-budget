@@ -1,35 +1,26 @@
-// Bills API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+import { getAdminDb, COLLECTIONS, DEFAULT_USER_ID } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/bills
 export async function GET(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get('filter');
-    
-    let query = adminDb.collection(COLLECTIONS.BILLS);
-    
-    if (filter === 'upcoming') {
-      const now = new Date();
-      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      query = query.where('dueDate', '>=', now).where('dueDate', '<=', nextWeek) as any;
-    }
-    
-    const snapshot = await query.orderBy('dueDate', 'asc').limit(50).get();
-    
+    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+
+    const snapshot = await adminDb
+      .collection(COLLECTIONS.BILLS)
+      .where('userId', '==', userId)
+      .orderBy('dueDate', 'asc')
+      .get();
+
     const bills = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
-    return NextResponse.json({
-      success: true,
-      data: bills,
-      count: bills.length,
-    });
+
+    return NextResponse.json({ success: true, data: bills, count: bills.length });
   } catch (error) {
     console.error('GET /api/bills error:', error);
     return NextResponse.json(
@@ -39,80 +30,82 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/bills
 export async function POST(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const body = await request.json();
+    const userId = body.userId || DEFAULT_USER_ID;
     
-    const docRef = await adminDb.collection(COLLECTIONS.BILLS).add({
+    const billData = {
       ...body,
-      dueDate: body.dueDate ? new Date(body.dueDate) : null,
-      isPaid: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    
-    return NextResponse.json({
-      success: true,
-      id: docRef.id,
-    });
+      userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await adminDb.collection(COLLECTIONS.BILLS).add(billData);
+
+    return NextResponse.json({ 
+      success: true, 
+      data: { id: docRef.id, ...billData } 
+    }, { status: 201 });
   } catch (error) {
     console.error('POST /api/bills error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create bill' },
+      { success: false, error: 'Failed to create bill', details: String(error) },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/bills
 export async function PUT(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const body = await request.json();
-    const { id, ...data } = body;
+    const { id, ...updateData } = body;
     
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Bill ID required' },
+        { success: false, error: 'Bill ID is required' },
         { status: 400 }
       );
     }
-    
+
     await adminDb.collection(COLLECTIONS.BILLS).doc(id).update({
-      ...data,
-      updatedAt: new Date(),
+      ...updateData,
+      updatedAt: new Date().toISOString(),
     });
-    
-    return NextResponse.json({ success: true, message: 'Bill updated' });
+
+    return NextResponse.json({ success: true, data: { id, ...updateData } });
   } catch (error) {
     console.error('PUT /api/bills error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update bill' },
+      { success: false, error: 'Failed to update bill', details: String(error) },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/bills
 export async function DELETE(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Bill ID required' },
+        { success: false, error: 'Bill ID is required' },
         { status: 400 }
       );
     }
-    
+
     await adminDb.collection(COLLECTIONS.BILLS).doc(id).delete();
-    
+
     return NextResponse.json({ success: true, message: 'Bill deleted' });
   } catch (error) {
     console.error('DELETE /api/bills error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete bill' },
+      { success: false, error: 'Failed to delete bill', details: String(error) },
       { status: 500 }
     );
   }
