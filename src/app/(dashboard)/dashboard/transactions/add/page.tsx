@@ -7,19 +7,19 @@ import Link from 'next/link';
 import { useTransactionMutations } from '@/hooks/useTransactions';
 import type { TransactionInput, TransactionCategory } from '@/types/transaction';
 
-// Categories matching TransactionCategory type
+// Categories matching the TransactionCategory type
 const categories: { id: TransactionCategory; name: string; icon: string }[] = [
-  { id: 'groceries', name: 'Groceries', icon: '🛒' },
   { id: 'food', name: 'Food & Dining', icon: '🍔' },
   { id: 'transport', name: 'Transport', icon: '🚗' },
   { id: 'utilities', name: 'Utilities', icon: '💡' },
   { id: 'entertainment', name: 'Entertainment', icon: '🎬' },
-  { id: 'shopping', name: 'Shopping', icon: '🛍️' },
+  { id: 'purchase', name: 'Shopping', icon: '🛍️' },
   { id: 'health', name: 'Health', icon: '💊' },
   { id: 'education', name: 'Education', icon: '📚' },
   { id: 'salary', name: 'Salary', icon: '💰' },
   { id: 'transfer', name: 'Transfer', icon: '↔️' },
   { id: 'bill', name: 'Bills', icon: '📄' },
+  { id: 'atm', name: 'ATM', icon: '🏧' },
   { id: 'other', name: 'Other', icon: '📋' },
 ];
 
@@ -27,31 +27,30 @@ export default function AddTransactionPage() {
   const router = useRouter();
   const { add, loading, error } = useTransactionMutations();
   const [success, setSuccess] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     type: 'expense' as 'expense' | 'income',
     amount: '',
     category: '' as TransactionCategory | '',
     merchant: '',
     description: '',
-    notes: '',
     date: new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.amount || !formData.category) return;
 
-    // Note: source is added automatically by addTransaction()
+    if (!formData.amount || !formData.category) {
+      return;
+    }
+
     const input: TransactionInput = {
       type: formData.type,
       amount: parseFloat(formData.amount),
       currency: 'LKR',
       category: formData.category as TransactionCategory,
       merchant: formData.merchant || undefined,
-      description: formData.description || formData.merchant || undefined,
-      notes: formData.notes || undefined,
+      description: formData.description || formData.merchant || formData.category,
       timestamp: new Date(formData.date),
     };
 
@@ -89,10 +88,10 @@ export default function AddTransactionPage() {
         <div className="card p-1 flex">
           <button
             type="button"
-            onClick={() => setFormData(d => ({ ...d, type: 'expense' }))}
+            onClick={() => setFormData((d) => ({ ...d, type: 'expense' }))}
             className={`flex-1 py-3 rounded-lg text-center font-medium transition-colors ${
-              formData.type === 'expense' 
-                ? 'bg-red-500 text-white' 
+              formData.type === 'expense'
+                ? 'bg-red-500 text-white'
                 : 'text-muted-foreground hover:bg-muted'
             }`}
           >
@@ -100,10 +99,10 @@ export default function AddTransactionPage() {
           </button>
           <button
             type="button"
-            onClick={() => setFormData(d => ({ ...d, type: 'income' }))}
+            onClick={() => setFormData((d) => ({ ...d, type: 'income' }))}
             className={`flex-1 py-3 rounded-lg text-center font-medium transition-colors ${
-              formData.type === 'income' 
-                ? 'bg-green-500 text-white' 
+              formData.type === 'income'
+                ? 'bg-green-500 text-white'
                 : 'text-muted-foreground hover:bg-muted'
             }`}
           >
@@ -119,7 +118,7 @@ export default function AddTransactionPage() {
             step="0.01"
             required
             value={formData.amount}
-            onChange={(e) => setFormData(d => ({ ...d, amount: e.target.value }))}
+            onChange={(e) => setFormData((d) => ({ ...d, amount: e.target.value }))}
             placeholder="0.00"
             className="w-full text-3xl font-bold bg-transparent border-none outline-none"
           />
@@ -133,7 +132,7 @@ export default function AddTransactionPage() {
               <button
                 type="button"
                 key={cat.id}
-                onClick={() => setFormData(d => ({ ...d, category: cat.id }))}
+                onClick={() => setFormData((d) => ({ ...d, category: cat.id }))}
                 className={`p-3 rounded-lg text-center transition-all ${
                   formData.category === cat.id
                     ? 'bg-primary text-white ring-2 ring-primary ring-offset-2'
@@ -154,7 +153,7 @@ export default function AddTransactionPage() {
             <input
               type="text"
               value={formData.merchant}
-              onChange={(e) => setFormData(d => ({ ...d, merchant: e.target.value }))}
+              onChange={(e) => setFormData((d) => ({ ...d, merchant: e.target.value }))}
               placeholder="e.g., Cargills, Keells"
               className="w-full px-4 py-3 bg-muted rounded-lg outline-none focus:ring-2 ring-primary"
             />
@@ -164,7 +163,7 @@ export default function AddTransactionPage() {
             <input
               type="text"
               value={formData.description}
-              onChange={(e) => setFormData(d => ({ ...d, description: e.target.value }))}
+              onChange={(e) => setFormData((d) => ({ ...d, description: e.target.value }))}
               placeholder="What was this for?"
               className="w-full px-4 py-3 bg-muted rounded-lg outline-none focus:ring-2 ring-primary"
             />
@@ -177,29 +176,13 @@ export default function AddTransactionPage() {
           <input
             type="date"
             value={formData.date}
-            onChange={(e) => setFormData(d => ({ ...d, date: e.target.value }))}
+            onChange={(e) => setFormData((d) => ({ ...d, date: e.target.value }))}
             className="w-full px-4 py-3 bg-muted rounded-lg outline-none focus:ring-2 ring-primary"
           />
         </div>
 
-        {/* Notes */}
-        <div className="card p-4">
-          <label className="block text-sm text-muted-foreground mb-2">Notes (optional)</label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) => setFormData(d => ({ ...d, notes: e.target.value }))}
-            placeholder="Additional notes..."
-            rows={3}
-            className="w-full px-4 py-3 bg-muted rounded-lg outline-none focus:ring-2 ring-primary resize-none"
-          />
-        </div>
-
         {/* Error Display */}
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm">{error}</div>}
 
         {/* Submit */}
         <button
