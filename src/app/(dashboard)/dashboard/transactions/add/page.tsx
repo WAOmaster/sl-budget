@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { useTransactionMutations } from '@/hooks/useTransactions';
 import type { TransactionInput, TransactionCategory } from '@/types/transaction';
 
-const categories = [
+// Categories matching TransactionCategory type
+const categories: { id: TransactionCategory; name: string; icon: string }[] = [
   { id: 'groceries', name: 'Groceries', icon: '🛒' },
   { id: 'food', name: 'Food & Dining', icon: '🍔' },
   { id: 'transport', name: 'Transport', icon: '🚗' },
@@ -18,14 +19,8 @@ const categories = [
   { id: 'education', name: 'Education', icon: '📚' },
   { id: 'salary', name: 'Salary', icon: '💰' },
   { id: 'transfer', name: 'Transfer', icon: '↔️' },
+  { id: 'bill', name: 'Bills', icon: '📄' },
   { id: 'other', name: 'Other', icon: '📋' },
-];
-
-const paymentMethods = [
-  { id: 'cash', name: 'Cash', icon: '💵' },
-  { id: 'card', name: 'Card', icon: '💳' },
-  { id: 'bank_transfer', name: 'Bank Transfer', icon: '🏦' },
-  { id: 'mobile_wallet', name: 'Mobile Wallet', icon: '📱' },
 ];
 
 export default function AddTransactionPage() {
@@ -36,25 +31,26 @@ export default function AddTransactionPage() {
   const [formData, setFormData] = useState({
     type: 'expense' as 'expense' | 'income',
     amount: '',
-    category: '',
+    category: '' as TransactionCategory | '',
     merchant: '',
     description: '',
     notes: '',
-    paymentMethod: 'cash',
     date: new Date().toISOString().split('T')[0],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.amount || !formData.category) return;
+
+    // Note: source is added automatically by addTransaction()
     const input: TransactionInput = {
-      source: 'manual',
       type: formData.type,
       amount: parseFloat(formData.amount),
       currency: 'LKR',
       category: formData.category as TransactionCategory,
       merchant: formData.merchant || undefined,
-      description: formData.description || formData.merchant,
+      description: formData.description || formData.merchant || undefined,
       notes: formData.notes || undefined,
       timestamp: new Date(formData.date),
     };
