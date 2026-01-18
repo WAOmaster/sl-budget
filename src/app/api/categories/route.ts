@@ -1,42 +1,57 @@
-// Categories API Route
-// GET, POST, PUT, DELETE operations for categories
-
+// Categories API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getCategories,
-  getCategoriesByType,
-  getCategory,
-  addCategory,
-  updateCategory,
-  deleteCategory,
-  DEFAULT_CATEGORIES,
-} from '@/services/categoryService';
-import type { CategoryInput } from '@/types';
+import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
+
+// Default categories for Sri Lanka
+const DEFAULT_CATEGORIES = [
+  { name: 'Food & Dining', icon: '🍛', type: 'expense', color: '#FF6B6B' },
+  { name: 'Transport', icon: '🚌', type: 'expense', color: '#4ECDC4' },
+  { name: 'Shopping', icon: '🛒', type: 'expense', color: '#45B7D1' },
+  { name: 'Bills & Utilities', icon: '💡', type: 'expense', color: '#96CEB4' },
+  { name: 'Entertainment', icon: '🎬', type: 'expense', color: '#FFEAA7' },
+  { name: 'Healthcare', icon: '🏥', type: 'expense', color: '#DDA0DD' },
+  { name: 'Education', icon: '📚', type: 'expense', color: '#98D8C8' },
+  { name: 'Groceries', icon: '🥬', type: 'expense', color: '#7FFF00' },
+  { name: 'Fuel', icon: '⛽', type: 'expense', color: '#FFB347' },
+  { name: 'Mobile & Internet', icon: '📱', type: 'expense', color: '#87CEEB' },
+  { name: 'Insurance', icon: '🛡️', type: 'expense', color: '#9B59B6' },
+  { name: 'Salary', icon: '💰', type: 'income', color: '#2ECC71' },
+  { name: 'Freelance', icon: '💻', type: 'income', color: '#3498DB' },
+  { name: 'Investments', icon: '📈', type: 'income', color: '#F1C40F' },
+  { name: 'Other Income', icon: '💵', type: 'income', color: '#1ABC9C' },
+  { name: 'Other', icon: '📦', type: 'expense', color: '#BDC3C7' },
+];
 
 // GET /api/categories
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type');
     
-    // Single category by ID
-    const id = searchParams.get('id');
-    if (id) {
-      const category = await getCategory(id);
-      if (!category) {
-        return NextResponse.json(
-          { success: false, error: 'Category not found' },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json({ success: true, data: category });
+    let query = adminDb.collection(COLLECTIONS.CATEGORIES);
+    
+    if (type && (type === 'income' || type === 'expense')) {
+      query = query.where('type', '==', type) as any;
     }
     
-    // Filter by type
-    const type = searchParams.get('type') as 'income' | 'expense' | 'both' | null;
+    const snapshot = await query.get();
     
-    const categories = type 
-      ? await getCategoriesByType(type)
-      : await getCategories();
+    // If no categories exist, return defaults
+    if (snapshot.empty) {
+      return NextResponse.json({
+        success: true,
+        data: DEFAULT_CATEGORIES,
+        count: DEFAULT_CATEGORIES.length,
+        isDefault: true,
+      });
+    }
+    
+    const categories = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
     
     return NextResponse.json({
       success: true,
@@ -45,10 +60,13 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('GET /api/categories error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch categories' },
-      { status: 500 }
-    );
+    // Return default categories on error
+    return NextResponse.json({
+      success: true,
+      data: DEFAULT_CATEGORIES,
+      count: DEFAULT_CATEGORIES.length,
+      isDefault: true,
+    });
   }
 }
 
@@ -57,85 +75,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.name || !body.icon || !body.color || !body.type) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: name, icon, color, type' },
-        { status: 400 }
-      );
-    }
+    const docRef = await adminDb.collection(COLLECTIONS.CATEGORIES).add({
+      ...body,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     
-    const input: CategoryInput = {
-      name: body.name,
-      nameSi: body.nameSi,
-      nameTa: body.nameTa,
-      icon: body.icon,
-      color: body.color,
-      type: body.type,
-      parentId: body.parentId,
-      budget: body.budget ? parseFloat(body.budget) : undefined,
-    };
-    
-    const id = await addCategory(input);
-    
-    return NextResponse.json(
-      { success: true, data: { id }, message: 'Category created' },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      success: true,
+      id: docRef.id,
+    });
   } catch (error) {
     console.error('POST /api/categories error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create category' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT /api/categories
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    
-    if (!body.id) {
-      return NextResponse.json(
-        { success: false, error: 'Category ID required' },
-        { status: 400 }
-      );
-    }
-    
-    const { id, ...data } = body;
-    await updateCategory(id, data);
-    
-    return NextResponse.json({ success: true, message: 'Category updated' });
-  } catch (error) {
-    console.error('PUT /api/categories error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update category' },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/categories
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Category ID required' },
-        { status: 400 }
-      );
-    }
-    
-    await deleteCategory(id);
-    
-    return NextResponse.json({ success: true, message: 'Category deleted' });
-  } catch (error) {
-    console.error('DELETE /api/categories error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete category' },
       { status: 500 }
     );
   }
