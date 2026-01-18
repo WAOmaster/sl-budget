@@ -1,12 +1,18 @@
-// Transaction Types for Budget Buddy
+// Transaction Types for SL Budget
+// Supports SMS integration + Manual entry + CSV/PDF uploads
 
 export type TransactionSource = "sms" | "manual" | "csv" | "pdf";
 export type TransactionType = "income" | "expense" | "transfer";
-export type TransactionCategory = 
-  | "purchase" | "atm" | "transfer" | "bill" | "salary" 
-  | "food" | "transport" | "utilities" | "entertainment" 
-  | "health" | "education" | "other";
 
+// Extended categories to match both SMS parsing and manual entry
+export type TransactionCategory = 
+  | "purchase" | "atm" | "transfer" | "bill" | "salary"
+  | "food" | "groceries" | "dining"
+  | "transport" | "utilities" | "entertainment"
+  | "shopping" | "health" | "education"
+  | "uncategorized" | "other";
+
+// Full transaction as stored in Firestore
 export interface Transaction {
   id: string;
   source: TransactionSource;
@@ -16,16 +22,22 @@ export interface Transaction {
   currency: string;
   merchant?: string;
   description?: string;
+  notes?: string;
   bank?: string;
   cardLast4?: string;
   balance?: number;
   reference?: string;
-  rawMessage?: string;
+  rawMessage?: string;       // Only for SMS
+  simNumber?: number;        // Only for SMS
+  needsReview?: boolean;
+  isRecurring?: boolean;
+  tags?: string[];
   timestamp: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
+// Input for creating manual transactions (source added by lib)
 export interface TransactionInput {
   type: TransactionType;
   category: TransactionCategory;
@@ -33,9 +45,14 @@ export interface TransactionInput {
   currency?: string;
   merchant?: string;
   description?: string;
+  notes?: string;
+  bank?: string;
   timestamp?: Date;
+  isRecurring?: boolean;
+  tags?: string[];
 }
 
+// Filters for querying transactions
 export interface TransactionFilters {
   startDate?: Date;
   endDate?: Date;
@@ -44,9 +61,12 @@ export interface TransactionFilters {
   source?: TransactionSource;
   minAmount?: number;
   maxAmount?: number;
+  merchant?: string;
+  needsReview?: boolean;
   limit?: number;
 }
 
+// Statistics summary
 export interface TransactionStats {
   totalIncome: number;
   totalExpenses: number;
