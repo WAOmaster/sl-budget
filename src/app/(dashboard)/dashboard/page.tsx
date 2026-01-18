@@ -1,27 +1,71 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight, TrendingUp, Wallet } from 'lucide-react';
+import { ChevronRight, TrendingUp, Wallet, Plus, Loader2 } from 'lucide-react';
 import { BalanceCard, StatsGrid } from '@/components/stats';
 import { TransactionList, Transaction } from '@/components/transactions';
 import { BudgetSummary, Budget } from '@/components/budgets';
 import { formatCurrency } from '@/lib/utils';
+import { useRealtimeTransactions, useTransactionStats } from '@/hooks/useTransactions';
 import { useAppStore } from '@/stores/app-store';
 import { differenceInDays } from 'date-fns';
+import { useMemo } from 'react';
+
+// Category icon mapping
+const categoryIcons: Record<string, string> = {
+  groceries: '🛒',
+  food: '🍔',
+  dining: '🍽️',
+  transport: '🚗',
+  utilities: '💡',
+  entertainment: '🎬',
+  shopping: '🛍️',
+  health: '💊',
+  education: '📚',
+  salary: '💰',
+  transfer: '↔️',
+  purchase: '💳',
+  withdrawal: '🏧',
+  payment: '💸',
+  uncategorized: '📋',
+};
 
 export default function DashboardPage() {
-  const { transactions, budgets, bills, user } = useAppStore();
+  // Firestore real-time data
+  const { transactions: firestoreTransactions, loading } = useRealtimeTransactions({ limit: 50 });
+  const { stats } = useTransactionStats();
+  
+  // Fallback to store for budgets, bills, user (not yet migrated)
+  const { budgets, bills, user } = useAppStore();
 
-  // Transform store data to component format
-  const displayTransactions: Transaction[] = transactions.slice(0, 4).map((t) => ({
-    id: t.id,
-    description: t.description,
-    amount: t.amount,
-    type: t.type,
-    category: { name: t.category, icon: t.categoryIcon },
-    date: new Date(t.date),
-    bank: t.bank,
-  }));
+  // Transform Firestore transactions to display format
+  const displayTransactions: Transaction[] = useMemo(() => {
+    return firestoreTransactions.slice(0, 4).map((t) => ({
+      id: t.id,
+      description: t.merchant || t.description || t.category || 'Transaction',
+      amount: t.amount,
+      type: t.type,
+      category: { 
+        name: t.category || 'uncategorized', 
+        icon: categoryIcons[t.category?.toLowerCase() || 'uncategorized'] || '📋'
+      },
+      date: t.timestamp instanceof Date ? t.timestamp : new Date(t.timestamp),
+      bank: t.bank || t.source,
+    }));
+  }, [firestoreTransactions]);
+
+  // Calculate stats from Firestore transactions
+  const calculatedStats = useMemo(() => {
+    const income = firestoreTransactions
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const expenses = firestoreTransactions
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    return { income, expenses, balance: income - expenses };
+  }, [firestoreTransactions]);
 
   const displayBudgets: Budget[] = budgets.slice(0, 3).map((b) => ({
     id: b.id,
@@ -38,18 +82,20 @@ export default function DashboardPage() {
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
     .slice(0, 3);
 
-  // Calculate stats from store data
-  const income = transactions
-    .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const expenses = transactions
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const balance = income - expenses + 80000; // Base balance
+  const balance = calculatedStats.income - calculatedStats.expenses + 80000;
   const monthlyBudget = budgets.reduce((sum, b) => sum + b.limit, 0);
   const budgetUsed = budgets.reduce((sum, b) => sum + b.spent, 0);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[50vh]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading transactions...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -63,9 +109,9 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <StatsGrid
-        income={income}
-        expenses={expenses}
-        savings={income - expenses}
+        income={calculatedStats.income}
+        expenses={calculatedStats.expenses}
+        savings={calculatedStats.income - calculatedStats.expenses}
         incomeChange={12}
         expenseChange={-8}
         savingsChange={5}
@@ -79,23 +125,35 @@ export default function DashboardPage() {
             View All <ChevronRight size={16} />
           </Link>
         </div>
-        <div className="card">
-          {displayTransactions.length > 0 ? (
-            <TransactionList
-              transactions={displayTransactions}
-              onTransactionClick={(t) => console.log('Clicked:', t)}
-            />
-          ) : (
-            <div className="p-8 text-center text-stone-500">
-              No transactions yet. Add your first transaction!
-            </div>
-          )}
-        </div>
+        {displayTransactions.length > 0 ? (
+          <TransactionList transactions={displayTransactions} />
+        ) : (
+          <div className="card p-8 text-center">
+            <p className="text-muted-foreground mb-4">No transactions yet</p>
+            <Link 
+              href="/dashboard/transactions/add"
+              className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              Add Transaction
+            </Link>
+          </div>
+        )}
       </section>
 
-      {/* Two Column Layout for Desktop */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Upcoming Bills */}
+      {/* Budget Summary */}
+      <section>
+        <div className="section-header">
+          <h2 className="section-title">Budget Overview</h2>
+          <Link href="/dashboard/budgets" className="section-action flex items-center gap-1">
+            Manage <ChevronRight size={16} />
+          </Link>
+        </div>
+        <BudgetSummary budgets={displayBudgets} />
+      </section>
+
+      {/* Upcoming Bills */}
+      {upcomingBills.length > 0 && (
         <section>
           <div className="section-header">
             <h2 className="section-title">Upcoming Bills</h2>
@@ -103,87 +161,31 @@ export default function DashboardPage() {
               View All <ChevronRight size={16} />
             </Link>
           </div>
-          <div className="card card-padding space-y-3">
+          <div className="card divide-y divide-border">
             {upcomingBills.map((bill) => {
-              const daysUntil = differenceInDays(new Date(bill.dueDate), new Date());
-              const isOverdue = daysUntil < 0;
+              const daysUntilDue = differenceInDays(new Date(bill.dueDate), new Date());
               return (
-                <div key={bill.id} className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    isOverdue ? 'bg-red-100' : 'bg-amber-100'
-                  }`}>
-                    <span>📄</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-stone-900">{bill.name}</p>
-                    <p className={`text-sm ${isOverdue ? 'text-red-500' : 'text-stone-500'}`}>
-                      {isOverdue
-                        ? `${Math.abs(daysUntil)} days overdue`
-                        : daysUntil === 0
-                        ? 'Due today'
-                        : `${daysUntil} days`}
+                <div key={bill.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{bill.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {daysUntilDue === 0 ? 'Due today' : 
+                       daysUntilDue === 1 ? 'Due tomorrow' :
+                       `Due in ${daysUntilDue} days`}
                     </p>
                   </div>
-                  <p className="font-mono font-medium text-stone-900">
-                    {formatCurrency(bill.amount)}
-                  </p>
+                  <p className="font-semibold">{formatCurrency(bill.amount)}</p>
                 </div>
               );
             })}
-            {upcomingBills.length === 0 && (
-              <p className="text-center text-stone-500 py-4">No upcoming bills</p>
-            )}
           </div>
         </section>
+      )}
 
-        {/* Budget Status */}
-        <section>
-          <div className="section-header">
-            <h2 className="section-title">Budget Status</h2>
-            <Link href="/dashboard/budgets" className="section-action flex items-center gap-1">
-              View All <ChevronRight size={16} />
-            </Link>
-          </div>
-          <div className="card card-padding">
-            {displayBudgets.length > 0 ? (
-              <BudgetSummary budgets={displayBudgets} />
-            ) : (
-              <p className="text-center text-stone-500 py-4">No budgets set</p>
-            )}
-          </div>
-        </section>
+      {/* Transaction count indicator */}
+      <div className="text-center text-sm text-muted-foreground">
+        {firestoreTransactions.length} transactions synced from Firestore
       </div>
-
-      {/* Smart Tips */}
-      <section>
-        <div className="section-header">
-          <h2 className="section-title">Smart Tips</h2>
-        </div>
-        <div className="space-y-3">
-          <div className="card card-padding flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <TrendingUp className="text-amber-600" size={20} />
-            </div>
-            <div>
-              <h3 className="font-medium text-stone-900">Food spending is 15% higher than last month</h3>
-              <p className="text-sm text-stone-500 mt-1">
-                You spent Rs. 4,200 more at restaurants. Consider meal prepping to save ~Rs. 3,000/month.
-              </p>
-            </div>
-          </div>
-          <div className="card card-padding flex gap-4 items-start">
-            <div className="w-10 h-10 rounded-full bg-tea-100 flex items-center justify-center flex-shrink-0">
-              <Wallet className="text-tea-600" size={20} />
-            </div>
-            <div>
-              <h3 className="font-medium text-stone-900">Great job on utilities!</h3>
-              <p className="text-sm text-stone-500 mt-1">
-                You&apos;re Rs. 800 under budget for electricity this month.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
