@@ -44,7 +44,7 @@ export default function DashboardPage() {
       id: t.id,
       description: t.merchant || t.description || t.category || 'Transaction',
       amount: t.amount,
-      type: t.type,
+      type: (t.type === 'transfer' ? 'expense' : t.type) as 'expense' | 'income',
       category: { 
         name: t.category || 'uncategorized', 
         icon: categoryIcons[t.category?.toLowerCase() || 'uncategorized'] || '📋'
