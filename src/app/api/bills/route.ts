@@ -1,79 +1,39 @@
-// Bills API Route
-// GET, POST, PUT, DELETE operations for bills
-
+// Bills API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getBills,
-  getBill,
-  getUpcomingBills,
-  getOverdueBills,
-  addBill,
-  updateBill,
-  markBillAsPaid,
-  deleteBill,
-  getBillSummary,
-  BILL_TEMPLATES,
-} from '@/services/billService';
-import type { BillInput } from '@/types';
+import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
 
 // GET /api/bills
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
-    // Single bill by ID
-    const id = searchParams.get('id');
-    if (id) {
-      const bill = await getBill(id);
-      if (!bill) {
-        return NextResponse.json(
-          { success: false, error: 'Bill not found' },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json({ success: true, data: bill });
-    }
-    
-    // Filter options
     const filter = searchParams.get('filter');
     
-    switch (filter) {
-      case 'upcoming':
-        const days = parseInt(searchParams.get('days') || '7', 10);
-        const upcoming = await getUpcomingBills(days);
-        return NextResponse.json({
-          success: true,
-          data: upcoming,
-          count: upcoming.length,
-        });
-      
-      case 'overdue':
-        const overdue = await getOverdueBills();
-        return NextResponse.json({
-          success: true,
-          data: overdue,
-          count: overdue.length,
-        });
-      
-      case 'summary':
-        const summary = await getBillSummary();
-        return NextResponse.json({ success: true, data: summary });
-      
-      case 'templates':
-        return NextResponse.json({ success: true, data: BILL_TEMPLATES });
-      
-      default:
-        const bills = await getBills();
-        return NextResponse.json({
-          success: true,
-          data: bills,
-          count: bills.length,
-        });
+    let query = adminDb.collection(COLLECTIONS.BILLS);
+    
+    if (filter === 'upcoming') {
+      const now = new Date();
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      query = query.where('dueDate', '>=', now).where('dueDate', '<=', nextWeek) as any;
     }
+    
+    const snapshot = await query.orderBy('dueDate', 'asc').limit(50).get();
+    
+    const bills = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    return NextResponse.json({
+      success: true,
+      data: bills,
+      count: bills.length,
+    });
   } catch (error) {
     console.error('GET /api/bills error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch bills' },
+      { success: false, error: 'Failed to fetch bills', details: String(error) },
       { status: 500 }
     );
   }
@@ -84,37 +44,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.name || !body.amount || !body.dueDate || !body.frequency) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: name, amount, dueDate, frequency' },
-        { status: 400 }
-      );
-    }
+    const docRef = await adminDb.collection(COLLECTIONS.BILLS).add({
+      ...body,
+      dueDate: body.dueDate ? new Date(body.dueDate) : null,
+      isPaid: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     
-    const input: BillInput = {
-      name: body.name,
-      nameSi: body.nameSi,
-      nameTa: body.nameTa,
-      amount: parseFloat(body.amount),
-      dueDate: new Date(body.dueDate),
-      frequency: body.frequency,
-      categoryId: body.categoryId,
-      category: body.category,
-      merchant: body.merchant,
-      accountNumber: body.accountNumber,
-      reminderEnabled: body.reminderEnabled !== false,
-      reminderDaysBefore: body.reminderDaysBefore || 3,
-      notes: body.notes,
-      autoPay: body.autoPay || false,
-    };
-    
-    const id = await addBill(input);
-    
-    return NextResponse.json(
-      { success: true, data: { id }, message: 'Bill created' },
-      { status: 201 }
-    );
+    return NextResponse.json({
+      success: true,
+      id: docRef.id,
+    });
   } catch (error) {
     console.error('POST /api/bills error:', error);
     return NextResponse.json(
@@ -128,33 +69,19 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
+    const { id, ...data } = body;
     
-    if (!body.id) {
+    if (!id) {
       return NextResponse.json(
         { success: false, error: 'Bill ID required' },
         { status: 400 }
       );
     }
     
-    // Handle mark as paid action
-    if (body.action === 'markPaid') {
-      await markBillAsPaid(
-        body.id,
-        body.paidAmount ? parseFloat(body.paidAmount) : undefined,
-        body.paidDate ? new Date(body.paidDate) : new Date()
-      );
-      return NextResponse.json({ success: true, message: 'Bill marked as paid' });
-    }
-    
-    // Regular update
-    const { id, action, ...data } = body;
-    
-    // Convert dueDate if present
-    if (data.dueDate) {
-      data.dueDate = new Date(data.dueDate);
-    }
-    
-    await updateBill(id, data);
+    await adminDb.collection(COLLECTIONS.BILLS).doc(id).update({
+      ...data,
+      updatedAt: new Date(),
+    });
     
     return NextResponse.json({ success: true, message: 'Bill updated' });
   } catch (error) {
@@ -179,7 +106,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    await deleteBill(id);
+    await adminDb.collection(COLLECTIONS.BILLS).doc(id).delete();
     
     return NextResponse.json({ success: true, message: 'Bill deleted' });
   } catch (error) {
