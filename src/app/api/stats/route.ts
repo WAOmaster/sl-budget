@@ -8,64 +8,53 @@ export async function GET(request: NextRequest) {
     const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || DEFAULT_USER_ID;
-    const period = searchParams.get('period') || 'month';
-
-    // Calculate date range
-    const now = new Date();
-    let startDate: Date;
     
-    switch (period) {
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      case 'month':
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    // Fetch transactions for the period
+    // Simple query - just get all transactions for user
     const snapshot = await adminDb
       .collection(COLLECTIONS.TRANSACTIONS)
       .where('userId', '==', userId)
-      .where('date', '>=', startDate.toISOString())
       .get();
-
+    
     const transactions = snapshot.docs.map(doc => doc.data());
-
-    // Calculate stats
+    
+    // Calculate stats client-side
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
     let totalIncome = 0;
     let totalExpenses = 0;
-    const categoryBreakdown: Record<string, number> = {};
-
+    let monthlyIncome = 0;
+    let monthlyExpenses = 0;
+    
     transactions.forEach((t: any) => {
-      const amount = Number(t.amount) || 0;
+      const amount = parseFloat(t.amount) || 0;
+      const txDate = t.date?.toDate?.() || new Date(t.date);
+      const isThisMonth = txDate >= startOfMonth;
+      
       if (t.type === 'income') {
         totalIncome += amount;
+        if (isThisMonth) monthlyIncome += amount;
       } else {
         totalExpenses += amount;
-        const category = t.category || 'Other';
-        categoryBreakdown[category] = (categoryBreakdown[category] || 0) + amount;
+        if (isThisMonth) monthlyExpenses += amount;
       }
     });
-
+    
     return NextResponse.json({
       success: true,
       data: {
         totalIncome,
         totalExpenses,
         balance: totalIncome - totalExpenses,
-        transactionCount: transactions.length,
-        categoryBreakdown,
-        period,
+        monthlyIncome,
+        monthlyExpenses,
+        monthlyBalance: monthlyIncome - monthlyExpenses,
+        transactionCount: transactions.length
       }
     });
-  } catch (error) {
-    console.error('GET /api/stats error:', error);
+  } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch stats', details: String(error) },
+      { success: false, error: 'Failed to fetch stats', details: error.message },
       { status: 500 }
     );
   }
