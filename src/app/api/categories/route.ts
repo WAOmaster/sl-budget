@@ -1,10 +1,8 @@
-// Categories API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+import { getAdminDb, COLLECTIONS, DEFAULT_USER_ID } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-// Default categories for Sri Lanka
 const DEFAULT_CATEGORIES = [
   { name: 'Food & Dining', icon: '🍛', type: 'expense', color: '#FF6B6B' },
   { name: 'Transport', icon: '🚌', type: 'expense', color: '#4ECDC4' },
@@ -24,71 +22,65 @@ const DEFAULT_CATEGORIES = [
   { name: 'Other', icon: '📦', type: 'expense', color: '#BDC3C7' },
 ];
 
-// GET /api/categories
 export async function GET(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
-    
-    let query = adminDb.collection(COLLECTIONS.CATEGORIES);
-    
-    if (type && (type === 'income' || type === 'expense')) {
-      query = query.where('type', '==', type) as any;
-    }
-    
-    const snapshot = await query.get();
-    
-    // If no categories exist, return defaults
+    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+
+    const snapshot = await adminDb
+      .collection(COLLECTIONS.CATEGORIES)
+      .where('userId', '==', userId)
+      .get();
+
     if (snapshot.empty) {
-      return NextResponse.json({
-        success: true,
+      return NextResponse.json({ 
+        success: true, 
         data: DEFAULT_CATEGORIES,
         count: DEFAULT_CATEGORIES.length,
-        isDefault: true,
+        isDefault: true 
       });
     }
-    
+
     const categories = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
-    return NextResponse.json({
-      success: true,
-      data: categories,
-      count: categories.length,
-    });
+
+    return NextResponse.json({ success: true, data: categories, count: categories.length });
   } catch (error) {
     console.error('GET /api/categories error:', error);
-    // Return default categories on error
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       data: DEFAULT_CATEGORIES,
       count: DEFAULT_CATEGORIES.length,
-      isDefault: true,
+      isDefault: true 
     });
   }
 }
 
-// POST /api/categories
 export async function POST(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const body = await request.json();
+    const userId = body.userId || DEFAULT_USER_ID;
     
-    const docRef = await adminDb.collection(COLLECTIONS.CATEGORIES).add({
+    const categoryData = {
       ...body,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    
-    return NextResponse.json({
-      success: true,
-      id: docRef.id,
-    });
+      userId,
+      createdAt: new Date().toISOString(),
+    };
+
+    const docRef = await adminDb.collection(COLLECTIONS.CATEGORIES).add(categoryData);
+
+    return NextResponse.json({ 
+      success: true, 
+      data: { id: docRef.id, ...categoryData } 
+    }, { status: 201 });
   } catch (error) {
     console.error('POST /api/categories error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create category' },
+      { success: false, error: 'Failed to create category', details: String(error) },
       { status: 500 }
     );
   }
