@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+    const userId = searchParams.get('userId');
     
-    const snapshot = await adminDb
-      .collection(COLLECTIONS.BUDGETS)
-      .where('userId', '==', userId)
-      .get();
+    const collectionRef = adminDb.collection(COLLECTIONS.BUDGETS);
+    const snapshot = userId 
+      ? await collectionRef.where('userId', '==', userId).get()
+      : await collectionRef.get();
     
     const budgets = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -32,11 +32,10 @@ export async function POST(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const body = await request.json();
-    const userId = body.userId || DEFAULT_USER_ID;
     
     const budget = {
       ...body,
-      userId,
+      userId: body.userId || DEFAULT_USER_ID,
       spent: body.spent || 0,
       createdAt: new Date(),
       updatedAt: new Date(),
