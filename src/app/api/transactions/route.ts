@@ -7,24 +7,34 @@ export async function GET(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+    const userId = searchParams.get('userId');
+    const limit = parseInt(searchParams.get('limit') || '100');
     
-    // Simple query - just filter by userId, sort client-side to avoid index
-    const snapshot = await adminDb
-      .collection(COLLECTIONS.TRANSACTIONS)
-      .where('userId', '==', userId)
-      .limit(100)
-      .get();
+    let query = adminDb.collection(COLLECTIONS.TRANSACTIONS).limit(limit);
     
-    const transactions = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    // Only filter by userId if explicitly provided
+    if (userId) {
+      query = query.where('userId', '==', userId);
+    }
     
-    // Sort by date client-side
+    const snapshot = await query.get();
+    
+    const transactions = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        // Normalize date fields
+        date: data.date?.toDate?.() || data.timestamp?.toDate?.() || data.createdAt?.toDate?.() || null,
+        createdAt: data.createdAt?.toDate?.() || null,
+        updatedAt: data.updatedAt?.toDate?.() || null,
+      };
+    });
+    
+    // Sort by date descending
     transactions.sort((a: any, b: any) => {
-      const dateA = a.date?.toDate?.() || new Date(a.date);
-      const dateB = b.date?.toDate?.() || new Date(b.date);
+      const dateA = new Date(a.date || a.createdAt || 0);
+      const dateB = new Date(b.date || b.createdAt || 0);
       return dateB.getTime() - dateA.getTime();
     });
     
@@ -41,11 +51,11 @@ export async function POST(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const body = await request.json();
-    const userId = body.userId || DEFAULT_USER_ID;
     
     const transaction = {
       ...body,
-      userId,
+      userId: body.userId || DEFAULT_USER_ID,
+      source: body.source || 'manual',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
