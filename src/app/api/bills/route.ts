@@ -9,12 +9,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
-    let query = adminDb.collection(COLLECTIONS.BILLS);
-    if (userId) {
-      query = query.where('userId', '==', userId);
-    }
+    const collectionRef = adminDb.collection(COLLECTIONS.BILLS);
+    const snapshot = userId 
+      ? await collectionRef.where('userId', '==', userId).get()
+      : await collectionRef.get();
     
-    const snapshot = await query.get();
     const bills = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
