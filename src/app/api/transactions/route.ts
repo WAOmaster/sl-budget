@@ -8,25 +8,30 @@ export async function GET(request: NextRequest) {
     const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || DEFAULT_USER_ID;
-    const limit = parseInt(searchParams.get('limit') || '50');
-
+    
+    // Simple query - just filter by userId, sort client-side to avoid index
     const snapshot = await adminDb
       .collection(COLLECTIONS.TRANSACTIONS)
       .where('userId', '==', userId)
-      .orderBy('date', 'desc')
-      .limit(limit)
+      .limit(100)
       .get();
-
+    
     const transactions = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-
-    return NextResponse.json({ success: true, data: transactions, count: transactions.length });
-  } catch (error) {
-    console.error('GET /api/transactions error:', error);
+    
+    // Sort by date client-side
+    transactions.sort((a: any, b: any) => {
+      const dateA = a.date?.toDate?.() || new Date(a.date);
+      const dateB = b.date?.toDate?.() || new Date(b.date);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    return NextResponse.json({ success: true, data: transactions });
+  } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch transactions', details: String(error) },
+      { success: false, error: 'Failed to fetch transactions', details: error.message },
       { status: 500 }
     );
   }
@@ -38,23 +43,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const userId = body.userId || DEFAULT_USER_ID;
     
-    const transactionData = {
+    const transaction = {
       ...body,
       userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-
-    const docRef = await adminDb.collection(COLLECTIONS.TRANSACTIONS).add(transactionData);
-
+    
+    const docRef = await adminDb.collection(COLLECTIONS.TRANSACTIONS).add(transaction);
+    
     return NextResponse.json({ 
       success: true, 
-      data: { id: docRef.id, ...transactionData } 
-    }, { status: 201 });
-  } catch (error) {
-    console.error('POST /api/transactions error:', error);
+      data: { id: docRef.id, ...transaction } 
+    });
+  } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: 'Failed to create transaction', details: String(error) },
+      { success: false, error: 'Failed to create transaction', details: error.message },
       { status: 500 }
     );
   }
