@@ -9,14 +9,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
-    let query = adminDb.collection(COLLECTIONS.TRANSACTIONS);
+    // Get all transactions (optionally filtered by userId)
+    const collectionRef = adminDb.collection(COLLECTIONS.TRANSACTIONS);
+    const snapshot = userId 
+      ? await collectionRef.where('userId', '==', userId).get()
+      : await collectionRef.get();
     
-    // Only filter by userId if explicitly provided
-    if (userId) {
-      query = query.where('userId', '==', userId);
-    }
-    
-    const snapshot = await query.get();
     const transactions = snapshot.docs.map(doc => doc.data());
     
     // Calculate stats
