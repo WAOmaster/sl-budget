@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, Plus, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useTransactionMutations } from '@/hooks/useTransactions';
-import type { TransactionInput } from '@/types/transaction';
+import type { TransactionInput, TransactionCategory } from '@/types/transaction';
 
 const categories = [
   { id: 'groceries', name: 'Groceries', icon: '🛒' },
@@ -52,7 +52,7 @@ export default function AddTransactionPage() {
       type: formData.type,
       amount: parseFloat(formData.amount),
       currency: 'LKR',
-      category: formData.category,
+      category: formData.category as TransactionCategory,
       merchant: formData.merchant || undefined,
       description: formData.description || formData.merchant,
       notes: formData.notes || undefined,
