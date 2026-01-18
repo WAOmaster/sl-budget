@@ -1,33 +1,54 @@
 // Firebase Admin SDK for Server-Side API Routes
-// This uses service account credentials for secure server-side access
+// Uses lazy initialization to avoid build-time errors
 
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-// Get or create admin app
-function getAdminApp(): App {
+// Cached instances
+let _adminApp: App | null = null;
+let _adminDb: Firestore | null = null;
+
+// Lazy getter for admin app - only initializes when called at runtime
+export function getAdminApp(): App {
+  if (_adminApp) {
+    return _adminApp;
+  }
+  
   if (getApps().length > 0) {
-    return getApps()[0];
+    _adminApp = getApps()[0];
+    return _adminApp;
   }
 
-  // Initialize with service account credentials from env
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY 
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-    : {
-        projectId: process.env.FIREBASE_PROJECT_ID || 'budget-buddy-1e3e8',
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      };
+  // Parse service account from env at runtime
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  
+  if (!serviceAccountKey) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set');
+  }
 
-  return initializeApp({
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountKey);
+  } catch (e) {
+    throw new Error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY as JSON');
+  }
+
+  _adminApp = initializeApp({
     credential: cert(serviceAccount),
-    projectId: serviceAccount.projectId || 'budget-buddy-1e3e8',
+    projectId: serviceAccount.project_id || 'budget-buddy-1e3e8',
   });
+
+  return _adminApp;
 }
 
-// Export admin Firestore instance
-export const adminApp = getAdminApp();
-export const adminDb = getFirestore(adminApp);
+// Lazy getter for Firestore instance
+export function getAdminDb(): Firestore {
+  if (_adminDb) {
+    return _adminDb;
+  }
+  _adminDb = getFirestore(getAdminApp());
+  return _adminDb;
+}
 
 // Collection names (same as client)
 export const COLLECTIONS = {
