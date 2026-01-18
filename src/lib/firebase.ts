@@ -1,9 +1,9 @@
 // Firebase Client Configuration for SL Budget
 // This config is for client-side Firestore access
 
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getFirestore, type Firestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, type Auth, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,39 +15,31 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (singleton pattern)
-let app: FirebaseApp;
-let db: Firestore;
-let auth: Auth;
-
-function initializeFirebase() {
+function getFirebaseApp(): FirebaseApp {
   if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
+    return initializeApp(firebaseConfig);
   }
-
-  db = getFirestore(app);
-  auth = getAuth(app);
-
-  // Connect to emulators in development
-  if (process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
-    try {
-      connectFirestoreEmulator(db, 'localhost', 8080);
-      connectAuthEmulator(auth, 'http://localhost:9099');
-    } catch (e) {
-      // Emulators already connected
-    }
-  }
-
-  return { app, db, auth };
+  return getApps()[0];
 }
 
-// Export initialized instances
-const firebase = initializeFirebase();
-export const firebaseApp = firebase.app;
-export const firestore = firebase.db;
-export const db = firebase.db; // Alias for backward compatibility
-export const firebaseAuth = firebase.auth;
+// Create singleton instances
+const firebaseApp = getFirebaseApp();
+const firestore = getFirestore(firebaseApp);
+const firebaseAuth = getAuth(firebaseApp);
+
+// Connect to emulators in development (only once)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
+  try {
+    connectFirestoreEmulator(firestore, 'localhost', 8080);
+    connectAuthEmulator(firebaseAuth, 'http://localhost:9099');
+  } catch (e) {
+    // Emulators already connected
+  }
+}
+
+// Export instances
+export { firebaseApp, firestore, firebaseAuth };
+export const db = firestore; // Alias for backward compatibility
 
 // Collection names
 export const COLLECTIONS = {
