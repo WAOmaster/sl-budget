@@ -7,22 +7,28 @@ export async function GET(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+    const userId = searchParams.get('userId');
     
-    const snapshot = await adminDb
-      .collection(COLLECTIONS.BILLS)
-      .where('userId', '==', userId)
-      .get();
+    let query = adminDb.collection(COLLECTIONS.BILLS);
+    if (userId) {
+      query = query.where('userId', '==', userId);
+    }
     
-    const bills = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    const snapshot = await query.get();
+    const bills = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        dueDate: data.dueDate?.toDate?.() || null,
+        createdAt: data.createdAt?.toDate?.() || null,
+      };
+    });
     
     // Sort by dueDate
     bills.sort((a: any, b: any) => {
-      const dateA = a.dueDate?.toDate?.() || new Date(a.dueDate);
-      const dateB = b.dueDate?.toDate?.() || new Date(b.dueDate);
+      const dateA = new Date(a.dueDate || 0);
+      const dateB = new Date(b.dueDate || 0);
       return dateA.getTime() - dateB.getTime();
     });
     
@@ -39,11 +45,10 @@ export async function POST(request: NextRequest) {
   try {
     const adminDb = getAdminDb();
     const body = await request.json();
-    const userId = body.userId || DEFAULT_USER_ID;
     
     const bill = {
       ...body,
-      userId,
+      userId: body.userId || DEFAULT_USER_ID,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
