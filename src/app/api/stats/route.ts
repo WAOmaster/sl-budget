@@ -1,23 +1,20 @@
-// Stats API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+import { getAdminDb, COLLECTIONS, DEFAULT_USER_ID } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/stats
 export async function GET(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
     const period = searchParams.get('period') || 'month';
-    
-    // Calculate date range based on period
+
+    // Calculate date range
     const now = new Date();
     let startDate: Date;
     
     switch (period) {
-      case 'today':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
       case 'week':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -27,56 +24,42 @@ export async function GET(request: NextRequest) {
       case 'month':
       default:
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
     }
-    
+
     // Fetch transactions for the period
-    const transactionsSnapshot = await adminDb
+    const snapshot = await adminDb
       .collection(COLLECTIONS.TRANSACTIONS)
-      .where('createdAt', '>=', startDate)
+      .where('userId', '==', userId)
+      .where('date', '>=', startDate.toISOString())
       .get();
-    
-    const transactions = transactionsSnapshot.docs.map(doc => doc.data());
-    
+
+    const transactions = snapshot.docs.map(doc => doc.data());
+
     // Calculate stats
     let totalIncome = 0;
     let totalExpenses = 0;
     const categoryBreakdown: Record<string, number> = {};
-    
-    transactions.forEach(txn => {
-      const amount = txn.amount || 0;
-      if (txn.type === 'income') {
+
+    transactions.forEach((t: any) => {
+      const amount = Number(t.amount) || 0;
+      if (t.type === 'income') {
         totalIncome += amount;
       } else {
         totalExpenses += amount;
-        const category = txn.category || 'uncategorized';
+        const category = t.category || 'Other';
         categoryBreakdown[category] = (categoryBreakdown[category] || 0) + amount;
       }
     });
-    
-    // Fetch upcoming bills
-    const billsSnapshot = await adminDb
-      .collection(COLLECTIONS.BILLS)
-      .where('isPaid', '==', false)
-      .limit(10)
-      .get();
-    
-    const upcomingBills = billsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
+
     return NextResponse.json({
       success: true,
       data: {
-        period,
         totalIncome,
         totalExpenses,
-        netSavings: totalIncome - totalExpenses,
+        balance: totalIncome - totalExpenses,
         transactionCount: transactions.length,
         categoryBreakdown,
-        upcomingBillsCount: upcomingBills.length,
-        upcomingBills: upcomingBills.slice(0, 5),
+        period,
       }
     });
   } catch (error) {
