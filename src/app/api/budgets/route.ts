@@ -1,28 +1,25 @@
-// Budgets API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+import { getAdminDb, COLLECTIONS, DEFAULT_USER_ID } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/budgets
 export async function GET(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId') || DEFAULT_USER_ID;
+
     const snapshot = await adminDb
       .collection(COLLECTIONS.BUDGETS)
-      .orderBy('createdAt', 'desc')
-      .limit(50)
+      .where('userId', '==', userId)
       .get();
-    
+
     const budgets = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
-    return NextResponse.json({
-      success: true,
-      data: budgets,
-      count: budgets.length,
-    });
+
+    return NextResponse.json({ success: true, data: budgets, count: budgets.length });
   } catch (error) {
     console.error('GET /api/budgets error:', error);
     return NextResponse.json(
@@ -32,79 +29,82 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/budgets
 export async function POST(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const body = await request.json();
+    const userId = body.userId || DEFAULT_USER_ID;
     
-    const docRef = await adminDb.collection(COLLECTIONS.BUDGETS).add({
+    const budgetData = {
       ...body,
-      spent: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    
-    return NextResponse.json({
-      success: true,
-      id: docRef.id,
-    });
+      userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const docRef = await adminDb.collection(COLLECTIONS.BUDGETS).add(budgetData);
+
+    return NextResponse.json({ 
+      success: true, 
+      data: { id: docRef.id, ...budgetData } 
+    }, { status: 201 });
   } catch (error) {
     console.error('POST /api/budgets error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to create budget' },
+      { success: false, error: 'Failed to create budget', details: String(error) },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/budgets
 export async function PUT(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const body = await request.json();
-    const { id, ...data } = body;
+    const { id, ...updateData } = body;
     
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Budget ID required' },
+        { success: false, error: 'Budget ID is required' },
         { status: 400 }
       );
     }
-    
+
     await adminDb.collection(COLLECTIONS.BUDGETS).doc(id).update({
-      ...data,
-      updatedAt: new Date(),
+      ...updateData,
+      updatedAt: new Date().toISOString(),
     });
-    
-    return NextResponse.json({ success: true, message: 'Budget updated' });
+
+    return NextResponse.json({ success: true, data: { id, ...updateData } });
   } catch (error) {
     console.error('PUT /api/budgets error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update budget' },
+      { success: false, error: 'Failed to update budget', details: String(error) },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/budgets
 export async function DELETE(request: NextRequest) {
   try {
+    const adminDb = getAdminDb();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Budget ID required' },
+        { success: false, error: 'Budget ID is required' },
         { status: 400 }
       );
     }
-    
+
     await adminDb.collection(COLLECTIONS.BUDGETS).doc(id).delete();
-    
+
     return NextResponse.json({ success: true, message: 'Budget deleted' });
   } catch (error) {
     console.error('DELETE /api/budgets error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to delete budget' },
+      { success: false, error: 'Failed to delete budget', details: String(error) },
       { status: 500 }
     );
   }
