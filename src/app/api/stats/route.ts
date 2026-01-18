@@ -1,101 +1,88 @@
-// Stats API Route
-// GET transaction statistics and dashboard data
-
+// Stats API Route using Firebase Admin SDK
 import { NextRequest, NextResponse } from 'next/server';
-import { getTransactionStats, getRecentTransactions, getTransactionsNeedingReview } from '@/services/transactionService';
-import { getUpcomingBills, getBillSummary } from '@/services/billService';
-import { getBudgetSummary, getActiveBudgetsWithSpending } from '@/services/budgetService';
+import { adminDb, COLLECTIONS } from '@/lib/firebase-admin';
+
+export const dynamic = 'force-dynamic';
 
 // GET /api/stats
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'all';
+    const period = searchParams.get('period') || 'month';
     
-    // Parse date range
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
-    
-    const period = searchParams.get('period');
+    // Calculate date range based on period
     const now = new Date();
+    let startDate: Date;
     
     switch (period) {
       case 'today':
-        startDate = new Date(now.setHours(0, 0, 0, 0));
-        endDate = new Date();
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         break;
       case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
-        endDate = new Date();
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1);
-        endDate = new Date(now.getFullYear(), 11, 31);
         break;
+      case 'month':
       default:
-        if (searchParams.get('startDate')) {
-          startDate = new Date(searchParams.get('startDate')!);
-        }
-        if (searchParams.get('endDate')) {
-          endDate = new Date(searchParams.get('endDate')!);
-        }
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
     }
     
-    // Return different stats based on type
-    switch (type) {
-      case 'transactions':
-        const transactionStats = await getTransactionStats(startDate, endDate);
-        return NextResponse.json({ success: true, data: transactionStats });
-      
-      case 'bills':
-        const billSummary = await getBillSummary();
-        return NextResponse.json({ success: true, data: billSummary });
-      
-      case 'budgets':
-        const budgetSummary = await getBudgetSummary();
-        return NextResponse.json({ success: true, data: budgetSummary });
-      
-      case 'dashboard':
-      case 'all':
-      default:
-        // Comprehensive dashboard data
-        const [
-          stats,
-          recentTransactions,
-          upcomingBills,
-          budgets,
-          pendingReview,
-          billStats,
-        ] = await Promise.all([
-          getTransactionStats(startDate, endDate),
-          getRecentTransactions(10),
-          getUpcomingBills(7),
-          getActiveBudgetsWithSpending(),
-          getTransactionsNeedingReview(5),
-          getBillSummary(),
-        ]);
-        
-        return NextResponse.json({
-          success: true,
-          data: {
-            stats,
-            recentTransactions,
-            upcomingBills,
-            budgets,
-            pendingReview,
-            billStats,
-            period: period || 'all-time',
-          },
-        });
-    }
+    // Fetch transactions for the period
+    const transactionsSnapshot = await adminDb
+      .collection(COLLECTIONS.TRANSACTIONS)
+      .where('createdAt', '>=', startDate)
+      .get();
+    
+    const transactions = transactionsSnapshot.docs.map(doc => doc.data());
+    
+    // Calculate stats
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    const categoryBreakdown: Record<string, number> = {};
+    
+    transactions.forEach(txn => {
+      const amount = txn.amount || 0;
+      if (txn.type === 'income') {
+        totalIncome += amount;
+      } else {
+        totalExpenses += amount;
+        const category = txn.category || 'uncategorized';
+        categoryBreakdown[category] = (categoryBreakdown[category] || 0) + amount;
+      }
+    });
+    
+    // Fetch upcoming bills
+    const billsSnapshot = await adminDb
+      .collection(COLLECTIONS.BILLS)
+      .where('isPaid', '==', false)
+      .limit(10)
+      .get();
+    
+    const upcomingBills = billsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    
+    return NextResponse.json({
+      success: true,
+      data: {
+        period,
+        totalIncome,
+        totalExpenses,
+        netSavings: totalIncome - totalExpenses,
+        transactionCount: transactions.length,
+        categoryBreakdown,
+        upcomingBillsCount: upcomingBills.length,
+        upcomingBills: upcomingBills.slice(0, 5),
+      }
+    });
   } catch (error) {
     console.error('GET /api/stats error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch stats' },
+      { success: false, error: 'Failed to fetch stats', details: String(error) },
       { status: 500 }
     );
   }
