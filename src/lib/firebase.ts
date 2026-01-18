@@ -1,9 +1,7 @@
 // Firebase Client Configuration for SL Budget
-// This config is for client-side Firestore access
-
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getFirestore, type Firestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getAuth, type Auth, connectAuthEmulator } from 'firebase/auth';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,24 +20,22 @@ function getFirebaseApp(): FirebaseApp {
   return getApps()[0];
 }
 
-// Create singleton instances
-const firebaseApp = getFirebaseApp();
-const firestore = getFirestore(firebaseApp);
-const firebaseAuth = getAuth(firebaseApp);
+const app = getFirebaseApp();
+export const db = getFirestore(app);
+export const firestore = db;
+export const auth = getAuth(app);
+export const firebaseApp = app;
+export const firebaseAuth = auth;
 
-// Connect to emulators in development (only once)
+// Connect to emulators in development
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true') {
   try {
-    connectFirestoreEmulator(firestore, 'localhost', 8080);
-    connectAuthEmulator(firebaseAuth, 'http://localhost:9099');
+    connectFirestoreEmulator(db, 'localhost', 8080);
+    connectAuthEmulator(auth, 'http://localhost:9099');
   } catch (e) {
     // Emulators already connected
   }
 }
-
-// Export instances
-export { firebaseApp, firestore, firebaseAuth };
-export const db = firestore; // Alias for backward compatibility
 
 // Collection names
 export const COLLECTIONS = {
@@ -53,5 +49,5 @@ export const COLLECTIONS = {
   SAVINGS_GOALS: 'savings_goals',
 } as const;
 
-// Default user ID for development (replace with auth user ID in production)
+// Default user ID for development
 export const DEFAULT_USER_ID = process.env.NEXT_PUBLIC_DEFAULT_USER_ID || 'default_user';
