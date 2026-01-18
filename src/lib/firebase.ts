@@ -46,6 +46,7 @@ function initializeFirebase() {
 const firebase = initializeFirebase();
 export const firebaseApp = firebase.app;
 export const firestore = firebase.db;
+export const db = firebase.db; // Alias for backward compatibility
 export const firebaseAuth = firebase.auth;
 
 // Collection names
