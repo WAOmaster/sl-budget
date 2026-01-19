@@ -291,6 +291,12 @@ export async function getTransactionsNeedingReview(maxResults: number = 20): Pro
   return snapshot.docs.map(docToTransaction);
 }
 
+
+// Get recent transactions (helper wrapper)
+export async function getRecentTransactions(maxResults: number = 20): Promise<Transaction[]> {
+  return getTransactions({ limit: maxResults });
+}
+
 // Get transaction count
 export async function getTransactionCount(filters: TransactionFilters = {}): Promise<number> {
   const constraints: QueryConstraint[] = [];
@@ -321,3 +327,4 @@ export async function getTransactionCount(filters: TransactionFilters = {}): Pro
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count;
 }
+
