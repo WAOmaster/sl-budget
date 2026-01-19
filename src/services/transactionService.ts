@@ -24,49 +24,19 @@ import {
 import { firestore, COLLECTIONS, DEFAULT_USER_ID } from '@/lib/firebase';
 import type { Transaction, TransactionInput, TransactionFilters, TransactionStats } from '@/types';
 
-// Helper function to safely convert Firestore timestamps to JavaScript Dates
+// FIXED: Helper function to safely convert Firestore timestamps to JavaScript Dates
 function safeConvertTimestamp(timestamp: any): Date {
-  if (!timestamp) {
-    return new Date();
-  }
-  
-  // If already a Date
-  if (timestamp instanceof Date) {
-    return timestamp;
-  }
-  
-  // Try calling toDate() if it exists and is a function
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
   if (timestamp && typeof timestamp.toDate === 'function') {
-    try {
-      return timestamp.toDate();
-    } catch (e) {
-      // If toDate() fails, continue to other methods
-      console.warn('toDate() call failed:', e);
-    }
+    try { return timestamp.toDate(); } catch (e) { }
   }
-  
-  // If it has _seconds property (Firestore Timestamp-like object)
-  if (timestamp && typeof timestamp._seconds === 'number') {
-    return new Date(timestamp._seconds * 1000);
-  }
-  
-  // If it has seconds property (alternative Firestore format)
-  if (timestamp && typeof timestamp.seconds === 'number') {
-    return new Date(timestamp.seconds * 1000);
-  }
-  
-  // Try parsing as string or number
+  if (timestamp?._seconds) return new Date(timestamp._seconds * 1000);
+  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000);
   try {
     const parsed = new Date(timestamp);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
-    }
-  } catch (e) {
-    console.warn('Date parsing failed:', e);
-  }
-  
-  // Last resort: current time
-  console.warn('Using current time as fallback for timestamp:', timestamp);
+    if (!isNaN(parsed.getTime())) return parsed;
+  } catch (e) { }
   return new Date();
 }
 
@@ -126,200 +96,190 @@ export async function getTransactions(filters: TransactionFilters = {}): Promise
     constraints.push(where('timestamp', '<=', Timestamp.fromDate(filters.endDate)));
   }
   
-  // Order by timestamp descending
+  // Add ordering and limit
   constraints.push(orderBy('timestamp', 'desc'));
-  
-  // Apply limit if specified
   if (filters.limit) {
     constraints.push(limit(filters.limit));
   }
   
   const q = query(collection(firestore, COLLECTIONS.TRANSACTIONS), ...constraints);
   const snapshot = await getDocs(q);
-  
   return snapshot.docs.map(docToTransaction);
 }
 
-// Get a single transaction by ID
+// Get single transaction by ID
 export async function getTransaction(id: string): Promise<Transaction | null> {
   const docRef = doc(firestore, COLLECTIONS.TRANSACTIONS, id);
   const docSnap = await getDoc(docRef);
-  
-  if (!docSnap.exists()) {
-    return null;
-  }
-  
-  return docToTransaction(docSnap);
+  return docSnap.exists() ? docToTransaction(docSnap) : null;
 }
 
-// Add a new transaction
+// Add manual transaction
 export async function addTransaction(input: TransactionInput): Promise<string> {
   const docRef = await addDoc(collection(firestore, COLLECTIONS.TRANSACTIONS), {
+    ...input,
     userId: DEFAULT_USER_ID,
     source: 'manual',
-    type: input.type,
-    amount: input.amount,
     currency: input.currency || 'LKR',
-    category: input.category,
-    merchant: input.merchant,
-    description: input.description,
-    notes: input.notes,
+    needsReview: false,
     timestamp: input.timestamp ? Timestamp.fromDate(input.timestamp) : serverTimestamp(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    needsReview: false,
-    isRecurring: false,
-    tags: [],
   });
-  
   return docRef.id;
 }
 
-// Update an existing transaction
-export async function updateTransaction(id: string, updates: Partial<TransactionInput>): Promise<void> {
+// Update transaction
+export async function updateTransaction(id: string, data: Partial<TransactionInput>): Promise<void> {
   const docRef = doc(firestore, COLLECTIONS.TRANSACTIONS, id);
   await updateDoc(docRef, {
-    ...updates,
+    ...data,
     updatedAt: serverTimestamp(),
   });
 }
 
-// Delete a transaction
+// Delete transaction
 export async function deleteTransaction(id: string): Promise<void> {
-  const docRef = doc(firestore, COLLECTIONS.TRANSACTIONS, id);
-  await deleteDoc(docRef);
+  await deleteDoc(doc(firestore, COLLECTIONS.TRANSACTIONS, id));
 }
 
-// Subscribe to real-time transaction updates
+// Mark transaction as reviewed
+export async function markAsReviewed(id: string, category?: string): Promise<void> {
+  const updates: Record<string, unknown> = {
+    needsReview: false,
+    updatedAt: serverTimestamp(),
+  };
+  if (category) {
+    updates.category = category;
+  }
+  await updateDoc(doc(firestore, COLLECTIONS.TRANSACTIONS, id), updates);
+}
+
+// Real-time subscription to transactions
 export function subscribeToTransactions(
   callback: (transactions: Transaction[]) => void,
   filters: TransactionFilters = {}
 ): () => void {
   const constraints: QueryConstraint[] = [];
   
-  // Build query constraints
-  if (filters.userId) {
-    constraints.push(where('userId', '==', filters.userId));
-  }
   if (filters.type) {
     constraints.push(where('type', '==', filters.type));
   }
-  if (filters.category) {
-    constraints.push(where('category', '==', filters.category));
-  }
-  if (filters.source) {
-    constraints.push(where('source', '==', filters.source));
-  }
-  if (filters.needsReview !== undefined) {
-    constraints.push(where('needsReview', '==', filters.needsReview));
-  }
-  
-  // Order by timestamp descending
-  constraints.push(orderBy('timestamp', 'desc'));
-  
-  // Apply limit if specified
   if (filters.limit) {
     constraints.push(limit(filters.limit));
   }
+  constraints.push(orderBy('timestamp', 'desc'));
   
   const q = query(collection(firestore, COLLECTIONS.TRANSACTIONS), ...constraints);
   
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const transactions = snapshot.docs.map(docToTransaction);
-      callback(transactions);
-    },
-    (error) => {
-      console.error('Transaction subscription error:', error);
-      callback([]); // Return empty array on error to prevent infinite loading
-    }
-  );
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.docs.map(docToTransaction));
+  });
 }
 
 // Get transaction statistics
 export async function getTransactionStats(
-  filters: TransactionFilters = {}
+  startDate?: Date,
+  endDate?: Date
 ): Promise<TransactionStats> {
-  const constraints: QueryConstraint[] = [];
+  const filters: TransactionFilters = {};
+  if (startDate) filters.startDate = startDate;
+  if (endDate) filters.endDate = endDate;
   
-  if (filters.startDate) {
-    constraints.push(where('timestamp', '>=', Timestamp.fromDate(filters.startDate)));
-  }
-  if (filters.endDate) {
-    constraints.push(where('timestamp', '<=', Timestamp.fromDate(filters.endDate)));
-  }
+  const transactions = await getTransactions(filters);
   
-  const q = query(collection(firestore, COLLECTIONS.TRANSACTIONS), ...constraints);
-  const snapshot = await getDocs(q);
-  
-  const transactions = snapshot.docs.map(docToTransaction);
-  
-  const income = transactions
-    .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const expenses = transactions
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  return {
-    totalIncome: income,
-    totalExpenses: expenses,
-    netBalance: income - expenses,
+  const stats: TransactionStats = {
+    totalIncome: 0,
+    totalExpense: 0,
+    balance: 0,
     transactionCount: transactions.length,
+    avgExpense: 0,
+    avgIncome: 0,
+    byCategory: {},
+    bySource: { sms: 0, manual: 0, csv: 0, pdf: 0 },
+    byDay: [],
+    topMerchants: [],
   };
-}
-
-// Mark transaction as reviewed
-export async function markAsReviewed(id: string): Promise<void> {
-  const docRef = doc(firestore, COLLECTIONS.TRANSACTIONS, id);
-  await updateDoc(docRef, {
-    needsReview: false,
-    updatedAt: serverTimestamp(),
-  });
-}
-
-// Get transactions needing review
-export async function getTransactionsNeedingReview(maxResults: number = 20): Promise<Transaction[]> {
-  const q = query(
-    collection(firestore, COLLECTIONS.TRANSACTIONS),
-    where('needsReview', '==', true),
-    orderBy('timestamp', 'desc'),
-    limit(maxResults)
-  );
   
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(docToTransaction);
-}
-
-// Get transaction count
-export async function getTransactionCount(filters: TransactionFilters = {}): Promise<number> {
-  const constraints: QueryConstraint[] = [];
+  const merchantMap = new Map<string, { amount: number; count: number }>();
+  const dayMap = new Map<string, { income: number; expense: number }>();
+  let incomeCount = 0;
+  let expenseCount = 0;
   
-  if (filters.userId) {
-    constraints.push(where('userId', '==', filters.userId));
-  }
-  if (filters.type) {
-    constraints.push(where('type', '==', filters.type));
-  }
-  if (filters.category) {
-    constraints.push(where('category', '==', filters.category));
-  }
-  if (filters.source) {
-    constraints.push(where('source', '==', filters.source));
-  }
-  if (filters.needsReview !== undefined) {
-    constraints.push(where('needsReview', '==', filters.needsReview));
-  }
-  if (filters.startDate) {
-    constraints.push(where('timestamp', '>=', Timestamp.fromDate(filters.startDate)));
-  }
-  if (filters.endDate) {
-    constraints.push(where('timestamp', '<=', Timestamp.fromDate(filters.endDate)));
+  for (const tx of transactions) {
+    // Income/Expense totals
+    if (tx.type === 'income') {
+      stats.totalIncome += tx.amount;
+      incomeCount++;
+    } else if (tx.type === 'expense') {
+      stats.totalExpense += tx.amount;
+      expenseCount++;
+    }
+    
+    // By category
+    if (tx.category) {
+      stats.byCategory[tx.category] = (stats.byCategory[tx.category] || 0) + tx.amount;
+    }
+    
+    // By source
+    if (tx.source) {
+      stats.bySource[tx.source] = (stats.bySource[tx.source] || 0) + tx.amount;
+    }
+    
+    // By merchant
+    if (tx.merchant) {
+      const existing = merchantMap.get(tx.merchant) || { amount: 0, count: 0 };
+      merchantMap.set(tx.merchant, {
+        amount: existing.amount + tx.amount,
+        count: existing.count + 1,
+      });
+    }
+    
+    // By day
+    const dateKey = tx.timestamp.toISOString().split('T')[0];
+    const dayData = dayMap.get(dateKey) || { income: 0, expense: 0 };
+    if (tx.type === 'income') {
+      dayData.income += tx.amount;
+    } else if (tx.type === 'expense') {
+      dayData.expense += tx.amount;
+    }
+    dayMap.set(dateKey, dayData);
   }
   
-  const q = query(collection(firestore, COLLECTIONS.TRANSACTIONS), ...constraints);
-  const snapshot = await getCountFromServer(q);
+  // Calculate derived stats
+  stats.balance = stats.totalIncome - stats.totalExpense;
+  stats.avgExpense = expenseCount > 0 ? stats.totalExpense / expenseCount : 0;
+  stats.avgIncome = incomeCount > 0 ? stats.totalIncome / incomeCount : 0;
+  
+  // Top merchants
+  stats.topMerchants = Array.from(merchantMap.entries())
+    .map(([merchant, data]) => ({ merchant, ...data }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10);
+  
+  // By day (sorted)
+  stats.byDay = Array.from(dayMap.entries())
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  return stats;
+}
+
+// Get transactions needing review (from SMS)
+export async function getTransactionsNeedingReview(limitCount = 20): Promise<Transaction[]> {
+  return getTransactions({ needsReview: true, limit: limitCount });
+}
+
+// Get recent transactions
+export async function getRecentTransactions(limitCount = 10): Promise<Transaction[]> {
+  return getTransactions({ limit: limitCount });
+}
+
+// Get transactions count
+export async function getTransactionsCount(): Promise<number> {
+  const coll = collection(firestore, COLLECTIONS.TRANSACTIONS);
+  const snapshot = await getCountFromServer(coll);
   return snapshot.data().count;
 }
+
+
