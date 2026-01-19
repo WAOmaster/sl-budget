@@ -39,7 +39,17 @@ function safeConvertTimestamp(timestamp: any): Date {
   } catch (e) { }
   return new Date();
 }
-
+// Helper to safely convert timestamps
+function toDate(ts: any): Date {
+  try {
+    if (ts?.toDate) return ts.toDate();
+    if (ts?._seconds) return new Date(ts._seconds * 1000);
+    if (ts instanceof Date) return ts;
+    return new Date(ts || Date.now());
+  } catch {
+    return new Date();
+  }
+}
 // Convert Firestore document to Transaction type
 function docToTransaction(doc: DocumentData): Transaction {
   const data = doc.data();
