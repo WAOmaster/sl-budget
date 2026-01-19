@@ -130,7 +130,7 @@ export function useTransactionStats(startDate?: Date, endDate?: Date) {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const data = await getTransactionStats(startDate, endDate);
+        const data = await getTransactionStats({ startDate, endDate });
         setStats(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch stats');
@@ -463,3 +463,4 @@ export function usePendingReview() {
 
   return { transactions, loading, refetch: fetchPending };
 }
+
