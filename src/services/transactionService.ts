@@ -73,9 +73,9 @@ function docToTransaction(doc: DocumentData): Transaction {
     needsReview: data.needsReview || false,
     isRecurring: data.isRecurring || false,
     tags: data.tags || [],
-    timestamp: safeConvertTimestamp(data.timestamp),
-    createdAt: safeConvertTimestamp(data.createdAt),
-    updatedAt: data.updatedAt ? safeConvertTimestamp(data.updatedAt) : null,
+    timestamp: toDate(data.timestamp),
+    createdAt: toDate(data.createdAt),
+    updatedAt: data.updatedAt ? toDate(data.updatedAt) : null,
   };
 }
 
