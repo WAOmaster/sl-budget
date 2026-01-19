@@ -30,7 +30,7 @@ export interface Transaction {
   tags?: string[];
   timestamp: Date;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface TransactionInput {
@@ -78,7 +78,7 @@ export interface Category {
   isActive: boolean;
   sortOrder: number;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface CategoryInput {
@@ -118,7 +118,7 @@ export interface Bill {
   nextDueDate?: Date;
   isActive: boolean;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface BillInput {
@@ -154,7 +154,7 @@ export interface Budget {
   alertThreshold: number; // percentage (0-100)
   isActive: boolean;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface BudgetInput {
@@ -183,7 +183,7 @@ export interface UserProfile {
   smsIntegrationEnabled: boolean;
   defaultCategories: string[];
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 export interface UserProfileInput {
@@ -250,7 +250,7 @@ export interface SavingsGoal {
   isCompleted: boolean;
   isActive: boolean;
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt: Date | null;
 }
 
 // ============ STATISTICS ============
@@ -300,3 +300,4 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   pageSize: number;
   hasMore: boolean;
 }
+
