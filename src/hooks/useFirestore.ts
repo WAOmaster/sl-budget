@@ -415,7 +415,7 @@ export function useDashboardData() {
       const [recentTransactions, stats, upcomingBills, budgetSummary, pendingReview] =
         await Promise.all([
           getRecentTransactions(10),
-          getTransactionStats(startOfMonth, endOfMonth),
+          getTransactionStats({ startDate: startOfMonth, endDate: endOfMonth }),
           getUpcomingBills(7),
           getBudgetSummary(),
           getTransactionsNeedingReview(5),
@@ -463,4 +463,5 @@ export function usePendingReview() {
 
   return { transactions, loading, refetch: fetchPending };
 }
+
 
