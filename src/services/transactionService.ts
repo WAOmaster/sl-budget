@@ -263,8 +263,8 @@ export async function getTransactionStats(
   
   return {
     totalIncome: income,
-    totalExpenses: expenses,
-    netBalance: income - expenses,
+    totalExpense: expenses,
+    balance: income - expenses,
     transactionCount: transactions.length,
   };
 }
@@ -327,4 +327,5 @@ export async function getTransactionCount(filters: TransactionFilters = {}): Pro
   const snapshot = await getCountFromServer(q);
   return snapshot.data().count;
 }
+
 
