@@ -261,11 +261,27 @@ export async function getTransactionStats(
     .filter((t) => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
   
+  // Calculate by category breakdown
+  const byCategory: Record<string, number> = {};
+  transactions.forEach((t) => {
+    const category = t.category || 'uncategorized';
+    byCategory[category] = (byCategory[category] || 0) + t.amount;
+  });
+  
+  // Calculate by source breakdown
+  const bySource: Record<string, number> = {};
+  transactions.forEach((t) => {
+    const source = t.source || 'manual';
+    bySource[source] = (bySource[source] || 0) + t.amount;
+  });
+  
   return {
     totalIncome: income,
-    totalExpense: expenses,
-    balance: income - expenses,
+    totalExpenses: expenses,
+    netBalance: income - expenses,
     transactionCount: transactions.length,
+    byCategory,
+    bySource,
   };
 }
 
